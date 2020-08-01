@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from functools import partial
 from typing import Tuple, List, Dict
 
 from src.utils import load_obj_from_file
@@ -128,3 +127,7 @@ def get_classify_dataset(path_, group_names, max_tokens_per_batch,
     )
 
     return epoch_iter
+
+
+if __name__ == '__main__':
+    print("implement test if needed")
