@@ -1,0 +1,4 @@
+[default]
+ckp_dir = 'workspace/omnitext/checkpoint'
+run_dir = '/workspace/omnitext/run'
+data_dir = '/workspace/omnitext/data'
