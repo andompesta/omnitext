@@ -1,0 +1,6 @@
+dynaconf==2.2.3
+fasttext==0.9.2
+streamlit==0.64.0
+fastapi==0.60.1
+pydantic==1.6.1
+uvicorn==0.11.8
