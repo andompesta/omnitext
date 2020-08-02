@@ -3,9 +3,10 @@ import torch
 from typing import Tuple, List, Dict
 
 from src.utils import load_obj_from_file
-from src.utils.data import OmniDataset, PAD_IDX
+from src.utils.data import OmniDataset
 from src.utils.data import data_utils
 from src.utils.data import iterators
+from src.utils.tokenizer import OmniTokenizer
 
 
 def classify_pad_bath(ids: List[List[int]], sizes: List[int], pad: int) -> List[np.array]:
@@ -45,6 +46,7 @@ class ClassifyDataset(OmniDataset):
         self.input_ids = group.get("ids")
         self.labels = group.get("labels")
         self.sizes = np.array(group.get("sizes"))
+        self.epoch = 1
 
     def __len__(self):
         return len(self.input_ids)
@@ -81,17 +83,17 @@ class ClassifyDataset(OmniDataset):
         self.epoch = epoch
 
 
-def get_classify_dataset(path_, group_names, max_tokens_per_batch,
-                         pad=PAD_IDX,
-                         shuffle=True,
-                         seed=0,
-                         max_sentence_length=256,
-                         max_sentences_per_batch=50,
-                         num_gpus=1,
-                         max_iter_length=0,
-                         num_workers=0,
-                         num_shards=1,
-                         shard_id=0
+def get_classify_dataset(path_, group_names, max_tokens_per_batch: int,
+                         pad: int,
+                         shuffle: bool = True,
+                         seed: int = 0,
+                         max_sentence_length: int = 256,
+                         max_sentences_per_batch: int = 50,
+                         num_gpus: int = 1,
+                         max_iter_length: int = 0,
+                         num_workers: int = 0,
+                         num_shards: int = 1,
+                         shard_id: int = 0
                          ):
 
     dataset = load_obj_from_file(path_)[group_names]

@@ -1,26 +1,10 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 from abc import ABC, abstractmethod
 
 
-BOS_TOKEN = "<s>"
-EOS_TOKEN = "</s>"
-PAD_TOKEN = "<pad>"
-UNK_TOKEN = "<unk>"
-MASK_TOKEN = "<msk>"
-
-BOS_IDX = 0
-EOS_IDX = 2
-PAD_IDX = 1
-UNK_IDX = 3
-MASK_IDX = 250001
-
-DUMMY_INPUT = [[0, 25378, 8999, 38, 2]]
-
-
 class OmniTokenizer(ABC):
-    def __init__(self, bos_token=BOS_TOKEN, bos_idx=BOS_IDX, eos_token=EOS_TOKEN, eos_idx=EOS_IDX,
-                 pad_token=PAD_TOKEN, pad_idx=PAD_IDX, unk_token=UNK_TOKEN, unk_idx=UNK_IDX,
-                 mask_token=MASK_TOKEN, mask_idx=MASK_IDX):
+    def __init__(self, bos_token, bos_idx, eos_token, eos_idx, pad_token, pad_idx, unk_token, unk_idx, mask_token,
+                 mask_idx):
 
         self.bos_token = bos_token
         self.bos_idx = bos_idx
@@ -37,18 +21,22 @@ class OmniTokenizer(ABC):
         self.mask_token = mask_token
         self.mask_idx = mask_idx
 
-    @abstractmethod
     @property
+    def dummy_input(self):
+        """
+        input to the model just to try
+        """
+        pass
+
+    @abstractmethod
     def vocab_size(self):
         """
         get the vocabulary size of the tokenizer
-        :return:
         """
-
         ...
 
     @abstractmethod
-    def get_vocab(self) -> Dict:
+    def get_vocab(self) -> Set:
         """
         get the vocabulary
         :return:
@@ -67,6 +55,13 @@ class OmniTokenizer(ABC):
         ...
 
     @abstractmethod
+    def _convert_id_to_token(self, index: int) -> str:
+        ...
+
+    @abstractmethod
+    def _convert_token_to_id(self, token: str) -> int:
+        ...
+
     def convert_ids_to_tokens(self, ids: List[int], skip_special_tokens=False) -> List[str]:
         """
         convert a single sequence of indices in a list of tokens
@@ -74,8 +69,12 @@ class OmniTokenizer(ABC):
         :param skip_special_tokens: if yes, remove special tokens
         :return:
         """
+        if skip_special_tokens:
+            ids = filter(lambda x: x not in self.special_ids, ids)
+        return [self._convert_id_to_token(id) for id in ids]
 
-        ...
+    def convert_tokens_to_ids(self, tokens: List[str]) -> List[int]:
+        return [self._convert_token_to_id(token) for token in tokens]
 
     @abstractmethod
     def convert_tokens_to_string(self, tokens: List[str]) -> str:

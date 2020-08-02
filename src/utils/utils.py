@@ -22,11 +22,11 @@ def load_obj_from_file(path_: str) -> object:
         obj = pickle.load(reader)
     return obj
 
-def save_data_to_json(path_:str, data:object):
+def save_data_to_json(path_:str, data: object):
     with open(ensure_dir(path_), "w", encoding="utf-8") as w:
-        json.dump(data, w, indent=2)
+        json.dump(data, w, indent=2, sort_keys=True, default=lambda o: o.__dict__)
 
-def load_data_from_json(path_:str) -> typing.Dict:
+def load_data_from_json(path_:str) -> object:
     with open(path_, "r", encoding="utf-8") as r:
         return json.load(r)
 

@@ -5,7 +5,7 @@ from torch import LongTensor
 from torch.utils.data import Dataset
 from abc import abstractmethod
 from typing import List
-from .omnitext_tokenizer import PAD_IDX
+from utils.tokenizer import PAD_IDX
 
 class OmniDataset(Dataset):
     """
