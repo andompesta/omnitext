@@ -27,6 +27,7 @@ class XLMRobertaConfig(BaseConf):
             layer_norm_eps=.00001,
             output_attentions=False,
             output_hidden_states=False,
+            url="https://dl.fbaipublicfiles.com/fairseq/models/xlmr.base.tar.gz",
             **kwargs
     ):
         super(XLMRobertaConfig, self).__init__(d_model=hidden_size,
@@ -42,6 +43,7 @@ class XLMRobertaConfig(BaseConf):
         self.layer_norm_eps = layer_norm_eps
         self.output_attentions = output_attentions
         self.output_hidden_states = output_hidden_states
+        self.url = url
 
         if "num_labels" in kwargs:
             self.num_labels = kwargs.get("num_labels")
