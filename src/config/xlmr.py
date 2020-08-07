@@ -1,6 +1,7 @@
 """ XLM-RoBERTa configuration """
 
 from .base import BaseConf
+from src.utils.tokenizer.xlmr import PAD_IDX
 
 class XLMRobertaConfig(BaseConf):
     """
@@ -28,6 +29,7 @@ class XLMRobertaConfig(BaseConf):
             output_attentions=False,
             output_hidden_states=False,
             url="https://dl.fbaipublicfiles.com/fairseq/models/xlmr.base.tar.gz",
+            pad_idx=PAD_IDX,
             **kwargs
     ):
         super(XLMRobertaConfig, self).__init__(d_model=hidden_size,
@@ -44,6 +46,7 @@ class XLMRobertaConfig(BaseConf):
         self.output_attentions = output_attentions
         self.output_hidden_states = output_hidden_states
         self.url = url
+        self.pad_idx = pad_idx
 
         if "num_labels" in kwargs:
             self.num_labels = kwargs.get("num_labels")
