@@ -200,4 +200,3 @@ if __name__ == '__main__':
 
 
     tok = Tokenizer(os.path.join(settings.get("ckp_dir"), "import", "sentencepiece.bpe.model"))
-    print(create_position_ids_from_input_ids(torch.LongTensor(tok.dummy_input), tok.pad_idx), tok.dummy_input)

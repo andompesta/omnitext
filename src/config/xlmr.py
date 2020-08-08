@@ -23,13 +23,14 @@ class XLMRobertaConfig(BaseConf):
             hidden_act="gelu",
             hidden_dropout_prob=.1,
             attention_probs_dropout_prob=.1,
-            max_position_embeddings=514,
+            intermediate_dropout_prob=0.,
+            max_position_embeddings=512,
             initializer_range=.02,
             layer_norm_eps=.00001,
-            output_attentions=False,
-            output_hidden_states=False,
             url="https://dl.fbaipublicfiles.com/fairseq/models/xlmr.base.tar.gz",
             pad_idx=PAD_IDX,
+            embedding_scale=None,
+            learned_pos_embeddings=True,
             **kwargs
     ):
         super(XLMRobertaConfig, self).__init__(d_model=hidden_size,
@@ -40,13 +41,14 @@ class XLMRobertaConfig(BaseConf):
         self.hidden_act = hidden_act
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.intermediate_dropout_prob = intermediate_dropout_prob
         self.max_position_embeddings = max_position_embeddings
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
-        self.output_attentions = output_attentions
-        self.output_hidden_states = output_hidden_states
         self.url = url
         self.pad_idx = pad_idx
+        self.embedding_scale = embedding_scale
+        self.learned_pos_embeddings = learned_pos_embeddings
 
         if "num_labels" in kwargs:
             self.num_labels = kwargs.get("num_labels")

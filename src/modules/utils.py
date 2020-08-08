@@ -84,48 +84,6 @@ class BaseModel(torch.nn.Module):
         return model
 
 
-
-def create_position_ids_from_input_ids(
-        input_ids: torch.Tensor,
-        padding_idx: int
-) -> torch.Tensor:
-    """
-    Replace non-padding symbols with their position numbers. Position numbers begin at
-    padding_idx+1. Padding symbols are ignored. This is modified from fairseq's
-
-    :param input_ids: tokens ids
-    :param padding_idx: Pad index
-    :return: positional embedding ids
-    """
-    # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
-    mask = input_ids.ne(padding_idx).int()
-    incremental_indices = torch.cumsum(mask, dim=1).type_as(mask) * mask
-    return incremental_indices.long() + padding_idx
-
-def create_sinusoidal_embeddings(
-        n_pos: int,
-        dim: int,
-        out: torch.Tensor
-):
-    """
-    Create a sinusoidal embedding for the positional embedding.
-    The embedding is detached thus with no gradient.
-
-    :param n_pos: max sequence length
-    :param dim: embedding dimension
-    :param out: output tensor
-    :return:
-    """
-
-    position_enc = np.array([
-        [pos / np.power(10000, 2 * (j // 2) / dim) for j in range(dim)] for pos in range(n_pos)
-    ])
-    out[:, 0::2] = torch.FloatTensor(np.sin(position_enc[:, 0::2]))
-    out[:, 1::2] = torch.FloatTensor(np.cos(position_enc[:, 0::2]))
-    out.detach_()
-    out.requires_grad = False
-
-
 def swich (x: torch.Tensor) -> torch.Tensor:
     return x * torch.sigmoid(x)
 
