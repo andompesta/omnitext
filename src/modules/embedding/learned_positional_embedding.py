@@ -26,7 +26,6 @@ class LearnedPositionalEmbedding(nn.Embedding):
     def forward(
         self,
         input_ids: Tensor,
-        incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]] = None,
         positions: Optional[Tensor] = None,
     ):
         """Input is expected to be of size [bsz x seqlen]."""

@@ -9,10 +9,6 @@ class XLMRobertaConfig(BaseConf):
     superclass for the appropriate documentation alongside usage examples.
     """
 
-    @property
-    def name(self) -> str:
-        return "xlm-roberta"
-
     def __init__(
             self,
             vocab_size=250002,
@@ -31,11 +27,13 @@ class XLMRobertaConfig(BaseConf):
             pad_idx=PAD_IDX,
             embedding_scale=None,
             learned_pos_embeddings=True,
+            name="xlm-roberta",
             **kwargs
     ):
         super(XLMRobertaConfig, self).__init__(d_model=hidden_size,
                                                n_head=num_attention_heads,
-                                               n_layer=num_hidden_layers)
+                                               n_layer=num_hidden_layers,
+                                               name=name)
         self.vocab_size = vocab_size
         self.intermediate_size = intermediate_size
         self.hidden_act = hidden_act

@@ -26,3 +26,6 @@ class TokenEmbedding(nn.Embedding):
             emb *= self.scale
 
         return emb
+
+    def _init_weights(self) -> None:
+        self.weight.data.normal_(mean=.0, std=self.initializer_range)

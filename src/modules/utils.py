@@ -1,6 +1,5 @@
 import torch
 import math
-import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional
 from os import path

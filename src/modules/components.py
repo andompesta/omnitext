@@ -3,7 +3,7 @@ from torch import nn, Tensor
 from typing import Optional, Tuple
 
 from .utils import ACT_NAME_TO_FN
-from src.config import XLMRobertaConfig, BaseConf
+from src.config import BaseConf
 
 
 class SelfAttention(nn.Module):
