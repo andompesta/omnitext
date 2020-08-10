@@ -10,6 +10,69 @@ from src.modules import (
 from src.modules.utils import ACT_NAME_TO_FN
 
 
+class RobertaEncoder(Encoder):
+    def __init__(self, conf: XLMRobertaConfig):
+        super(RobertaEncoder, self).__init__(conf)
+
+    def forward(
+            self,
+            input_ids: Tensor,
+            position_ids: Optional[Tensor] = None,
+            attention_mask: Optional[Tensor] = None,
+            output_attentions: bool = False,
+            output_hidden_states: bool = False,
+    ):
+        if attention_mask is None:
+            # do not attend of pad_idx
+            attention_mask = input_ids.eq(self.pad_idx)
+
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        extended_attention_mask = self.get_extended_attention_mask(attention_mask)
+
+        outputs = super(RobertaEncoder, self).forward(
+            input_ids=input_ids,
+            attention_mask=extended_attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            position_ids=position_ids
+        )
+        return outputs
+
+    def get_extended_attention_mask(
+            self,
+            attention_mask: Tensor
+    ) -> Tensor:
+        """
+        Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
+        Arguments:
+            attention_mask (:obj:`torch.Tensor`):
+                Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
+        Returns:
+            :obj:`torch.Tensor` The extended attention mask, with a the same dtype as :obj:`attention_mask.dtype`.
+        """
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            # Provided a padding mask of dimensions [batch_size, seq_length]
+            # - if the model is an encoder, make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
+            extended_attention_mask = attention_mask[:, None, None, :]
+        else:
+            raise ValueError(
+                "Wrong shape for attention_mask (shape {})".format(attention_mask.shape)
+            )
+
+        # Since attention_mask is 0.0 for positions we want to attend and 1.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = extended_attention_mask.to(dtype=self.dtype)  # fp16 compatibility
+        extended_attention_mask = extended_attention_mask * -10000.0
+        return extended_attention_mask
+
 class RobertaLMHead(nn.Module):
     """Head for masked language modeling."""
 
@@ -70,7 +133,7 @@ class RobertaMaskedLanguageModel(BaseModel):
         conf.name += "-mlm"
         super(RobertaMaskedLanguageModel, self).__init__(conf)
 
-        self.sentence_encoder = Encoder(conf)
+        self.sentence_encoder = RobertaEncoder(conf)
         self.lm_head = RobertaLMHead(conf)
 
         self.tie_weights()
@@ -130,7 +193,7 @@ class RobertaClassificationModel(BaseModel):
     def __init__(self, conf: XLMRobertaConfig):
         conf.name += "-classify"
         super(RobertaClassificationModel, self).__init__(conf)
-        self.sentence_encoder = Encoder(conf)
+        self.sentence_encoder = RobertaEncoder(conf)
         self.classification_head = RobertaClassificationHead(conf)
 
         self.init_weights()
