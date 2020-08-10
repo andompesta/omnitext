@@ -128,10 +128,10 @@ class RobertaClassificationHead(nn.Module):
         return x
 
 
-class RobertaMaskedLanguageModel(BaseModel):
+class XlmMaskedLanguageModel(BaseModel):
     def __init__(self, conf: XLMRobertaConfig):
         conf.name += "-mlm"
-        super(RobertaMaskedLanguageModel, self).__init__(conf)
+        super(XlmMaskedLanguageModel, self).__init__(conf)
 
         self.sentence_encoder = RobertaEncoder(conf)
         self.lm_head = RobertaLMHead(conf)
@@ -189,10 +189,10 @@ class RobertaMaskedLanguageModel(BaseModel):
         return self.lm_head.decoder
 
 
-class RobertaClassificationModel(BaseModel):
+class XlmClassificationModel(BaseModel):
     def __init__(self, conf: XLMRobertaConfig):
         conf.name += "-classify"
-        super(RobertaClassificationModel, self).__init__(conf)
+        super(XlmClassificationModel, self).__init__(conf)
         self.sentence_encoder = RobertaEncoder(conf)
         self.classification_head = RobertaClassificationHead(conf)
 
