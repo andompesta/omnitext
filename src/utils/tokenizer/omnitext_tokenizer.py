@@ -3,8 +3,19 @@ from abc import ABC, abstractmethod
 
 
 class OmniTokenizer(ABC):
-    def __init__(self, bos_token, bos_idx, eos_token, eos_idx, pad_token, pad_idx, unk_token, unk_idx, mask_token,
-                 mask_idx):
+    def __init__(
+            self,
+            bos_token: str,
+            bos_idx: int,
+            eos_token: str,
+            eos_idx: int,
+            pad_token: str,
+            pad_idx: int,
+            unk_token: str,
+            unk_idx: int,
+            mask_token: str,
+            mask_idx: int
+    ):
 
         self.bos_token = bos_token
         self.bos_idx = bos_idx
@@ -100,7 +111,7 @@ class OmniTokenizer(ABC):
 
         ...
 
-    def decode(self, tokens_ids: List[int], skip_special_tokens=False) -> str:
+    def decode(self, tokens_ids: List[int], skip_special_tokens: bool = True) -> str:
         """
         decode input tokens
         :param tokens_ids: input tokens

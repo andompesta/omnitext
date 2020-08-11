@@ -5,7 +5,7 @@ from sentencepiece import SentencePieceProcessor
 from typing import Dict, List, Set, Optional
 from itertools import chain
 
-SPIECE_UNDERLINE = "_"
+SPIECE_UNDERLINE = "▁"
 BOS_TOKEN = "<s>"
 EOS_TOKEN = "</s>"
 PAD_TOKEN = "<pad>"
@@ -39,11 +39,14 @@ class Tokenizer(OmniTokenizer):
         self.spm.Load(path_)
         self.vocab_path = path_
 
-        self.special_tokens_to_ids = dict(bos_token=self.bos_idx,
-                                          eos_token=self.eos_idx,
-                                          pad_token=self.pad_idx,
-                                          unk_token=self.unk_idx,
-                                          mask_token=self.mask_idx)
+        self.special_tokens_to_ids = {
+            self.bos_token: self.bos_idx,
+            self.eos_token: self.eos_idx,
+            self.pad_token: self.pad_idx,
+            self.unk_token: self.unk_idx,
+            self.mask_token: self.mask_idx
+        }
+
         self.special_ids_to_tokens = dict([(k, v) for (v, k) in self.special_tokens_to_ids.items()])
         self.special_tokens = set(self.special_tokens_to_ids.keys())
         self.special_ids = set(self.special_ids_to_tokens.keys())
@@ -135,7 +138,7 @@ class Tokenizer(OmniTokenizer):
         return len(self.spm) + self.special_offset + 1 # add mask token
 
     def get_vocab(self) -> Dict:
-        vocab = {[(self._convert_id_to_token(id), id) for id in range(self.vocab_size())]}
+        vocab = dict([(self._convert_id_to_token(id), id) for id in range(self.vocab_size())])
         return vocab
 
     def truncate_sequences(self, ids: List[int], pari_ids: Optional[List[int]], num_token_to_remove: int = 0):
@@ -196,7 +199,19 @@ if __name__ == '__main__':
     import os
     from dynaconf import settings
 
-
-
-
+    xlmr = torch.hub.load('pytorch/fairseq', 'xlmr.large')
     tok = Tokenizer(os.path.join(settings.get("ckp_dir"), "import", "sentencepiece.bpe.model"))
+
+    en_tokens = xlmr.encode('Hello world!')
+    assert en_tokens.tolist() == [0, 35378, 8999, 38, 2]
+
+    input_ids = tok.encode('Hello world!')["input_ids"]
+    assert en_tokens.tolist() == input_ids
+    print(input_ids)
+
+    input_ids = tok.encode('<msk>')["input_ids"]
+    print(input_ids)
+
+    input_ids = tok.encode('ciao <msk> mondo')["input_ids"]
+    print(input_ids)
+    print(tok.decode(input_ids, skip_special_tokens=False))
