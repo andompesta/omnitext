@@ -1,7 +1,4 @@
 # code inspired by https://github.com/pytorch/fairseq/blob/master/fairseq/data/iterators.py
-
-from __future__ import absolute_import, print_function, unicode_literals
-
 import itertools
 import math
 import operator

@@ -1,11 +1,9 @@
-from __future__ import absolute_import, print_function, unicode_literals
 
 import numpy as np
 from torch import LongTensor
 from torch.utils.data import Dataset
 from abc import abstractmethod
 from typing import List
-from utils.tokenizer import PAD_IDX
 
 class OmniDataset(Dataset):
     """
@@ -29,7 +27,7 @@ class OmniDataset(Dataset):
         return False
 
 
-    def __init__(self, pad: int = PAD_IDX, shuffle: bool = True):
+    def __init__(self, pad: int, shuffle: bool = True):
         self.pad = pad
         self.shuffle = shuffle
 

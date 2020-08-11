@@ -29,3 +29,5 @@ class TokenEmbedding(nn.Embedding):
 
     def _init_weights(self) -> None:
         self.weight.data.normal_(mean=.0, std=self.initializer_range)
+        if self.padding_idx is not None:
+            nn.init.constant_(self.weight.data[self.padding_idx], 0)

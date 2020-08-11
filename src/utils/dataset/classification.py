@@ -6,7 +6,6 @@ from src.utils import load_obj_from_file
 from src.utils.data import OmniDataset
 from src.utils.data import data_utils
 from src.utils.data import iterators
-from src.utils.tokenizer import OmniTokenizer
 
 
 def classify_pad_bath(ids: List[List[int]], sizes: List[int], pad: int) -> List[np.array]:

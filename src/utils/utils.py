@@ -1,11 +1,9 @@
-from __future__ import absolute_import
-
 import json
 import pickle
 import typing
-from os import path, makedirs
 import torch
 import shutil
+from os import path, makedirs
 
 def ensure_dir(path_: str) -> str:
     dir = path.dirname(path_)

@@ -23,7 +23,6 @@ class SelfAttention(nn.Module):
         self.query = nn.Linear(self.hidden_size, self.all_head_size)
         self.key = nn.Linear(self.hidden_size, self.all_head_size)
         self.value = nn.Linear(self.hidden_size, self.all_head_size)
-        self.output = nn.Linear(self.all_head_size, self.hidden_size)
 
         self.dropout = nn.Dropout(conf.attention_probs_dropout_prob)
         self.scaling = self.attention_head_size ** -0.5
@@ -69,8 +68,6 @@ class SelfAttention(nn.Module):
         next_context_h_shape = context_h.size()[:-2] + (self.all_head_size,)
         context_h = context_h.view(*next_context_h_shape)
 
-        context_h = self.output(context_h)
-
         output = (context_h, attention_probs) if output_attentions else (context_h, )
         return output
 
@@ -84,15 +81,17 @@ class SelfOutput(nn.Module):
 
         self.dense = nn.Linear(self.hidden_size, self.hidden_size)
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
-        self.self_attention_layer_norm = nn.LayerNorm(self.hidden_size,
-                                                      eps=self.layer_norm_eps,
-                                                      elementwise_affine=True)
+        self.layer_norm = nn.LayerNorm(
+            self.hidden_size,
+            eps=self.layer_norm_eps,
+            elementwise_affine=True
+        )
 
     def forward(self, hidden_state: Tensor, residual: Tensor):
-        hidden_state = self.dropout(hidden_state)
         hidden_state = self.dense(hidden_state)
+        hidden_state = self.dropout(hidden_state)
         hidden_state = hidden_state + residual
-        return self.self_attention_layer_norm(hidden_state)
+        return self.layer_norm(hidden_state)
 
 class Intermediate(nn.Module):
     def __init__(self, conf: BaseConf):
@@ -102,13 +101,12 @@ class Intermediate(nn.Module):
         self.dropout_prob = conf.intermediate_dropout_prob
 
         self.dropout = nn.Dropout(self.dropout_prob)
-        self.dense = nn.Sequential(
-            nn.Linear(self.hidden_size, self.output_size),
-            ACT_NAME_TO_FN[conf.hidden_act]
-        )
+        self.activation_fn = ACT_NAME_TO_FN[conf.hidden_act]
+        self.dense = nn.Linear(self.hidden_size, self.output_size)
 
     def forward(self, hidden_state: Tensor) -> Tensor:
         hidden_state = self.dense(hidden_state)
+        hidden_state = self.activation_fn(hidden_state)
         hidden_state = self.dropout(hidden_state)
         return hidden_state
 
@@ -123,9 +121,9 @@ class Output(nn.Module):
 
         self.dense = nn.Linear(self.intermediate_size, self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_prob)
-        self.output_layer_norm = nn.LayerNorm(self.hidden_size,
-                                              eps=self.layer_norm_eps,
-                                              elementwise_affine=True)
+        self.layer_norm = nn.LayerNorm(self.hidden_size,
+                                       eps=self.layer_norm_eps,
+                                       elementwise_affine=True)
 
     def forward(
             self,
@@ -135,5 +133,5 @@ class Output(nn.Module):
         hidden_state = self.dense(hidden_state)
         hidden_state = self.dropout(hidden_state)
         hidden_state = residual + hidden_state
-        hidden_state = self.output_layer_norm(hidden_state)
+        hidden_state = self.layer_norm(hidden_state)
         return hidden_state

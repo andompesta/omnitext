@@ -128,10 +128,10 @@ class RobertaClassificationHead(nn.Module):
         return x
 
 
-class XlmMaskedLanguageModel(BaseModel):
+class XLMMaskedLanguageModel(BaseModel):
     def __init__(self, conf: XLMRobertaConfig):
         conf.name += "-mlm"
-        super(XlmMaskedLanguageModel, self).__init__(conf)
+        super(XLMMaskedLanguageModel, self).__init__(conf)
 
         self.sentence_encoder = RobertaEncoder(conf)
         self.lm_head = RobertaLMHead(conf)
@@ -162,7 +162,7 @@ class XlmMaskedLanguageModel(BaseModel):
         return outputs
 
     def _init_weights(self, module: torch.nn.Module):
-        if hasattr(module, "_init_weights"):
+        if hasattr(module, "_init_weights") and not isinstance(module, XLMMaskedLanguageModel):
             module._init_weights()
             print("_init_weights for {}".format(module))
 
@@ -179,8 +179,14 @@ class XlmMaskedLanguageModel(BaseModel):
 
             print("embedding init for {}".format(module))
 
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant(module.bias, 0.)
+            nn.init.constant(module.weight, 1.)
+            print("layer norm init for {}".format(module))
+
         else:
             print("----> WARNING: module {} not initialized".format(module))
+
 
     def get_input_embeddings(self):
         return self.sentence_encoder.embed_tokens
@@ -189,10 +195,10 @@ class XlmMaskedLanguageModel(BaseModel):
         return self.lm_head.decoder
 
 
-class XlmClassificationModel(BaseModel):
+class XLMClassificationModel(BaseModel):
     def __init__(self, conf: XLMRobertaConfig):
         conf.name += "-classify"
-        super(XlmClassificationModel, self).__init__(conf)
+        super(XLMClassificationModel, self).__init__(conf)
         self.sentence_encoder = RobertaEncoder(conf)
         self.classification_head = RobertaClassificationHead(conf)
 
@@ -221,7 +227,7 @@ class XlmClassificationModel(BaseModel):
         return outputs
 
     def _init_weights(self, module: torch.nn.Module):
-        if hasattr(module, "_init_weights"):
+        if hasattr(module, "_init_weights") and not isinstance(module, XLMClassificationModel):
             module._init_weights()
             print("_init_weights for {}".format(module))
 
@@ -238,6 +244,11 @@ class XlmClassificationModel(BaseModel):
 
             print("embedding init for {}".format(module))
 
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant_(module.bias, 0.)
+            nn.init.constant_(module.weight, 1.)
+            print("layer norm init for {}".format(module))
+
         else:
             print("----> WARNING: module {} not initialized".format(module))
 
@@ -249,4 +260,75 @@ class XlmClassificationModel(BaseModel):
 
 
 
+if __name__ == '__main__':
+    import os
+    from dynaconf import settings
+    import re
 
+    conf = XLMRobertaConfig(num_labels=2)
+    my_xlmr = XLMClassificationModel(conf)
+
+    fair_seq_xlmr = torch.hub.load('pytorch/fairseq', 'xlmr.base')
+
+    state_dict = fair_seq_xlmr.state_dict()
+
+    # fix import names
+    state_dict.pop('_float_tensor')
+    state_dict = dict([(name.replace("model.encoder.", ""), value) for name, value in state_dict.items()])
+
+    # rename dict
+    renamed_dict = dict()
+    for name, value in state_dict.items():
+        if not name.startswith("sentence_encoder"):
+            continue
+
+        name = name.split(".")
+        new_name = name[0]
+
+        if name[1] == "layers":
+            new_name += ".layer." + name[2] + "."
+
+            if name[3] == "self_attn":
+                if name[4] == "k_proj":
+                    new_name += name[3] + ".key." + name[5]
+                elif name[4] == "v_proj":
+                    new_name += name[3] + ".value." + name[5]
+                elif name[4] == "q_proj":
+                    new_name += name[3] + ".query." + name[5]
+                elif name[4] == "out_proj":
+                    new_name += "self_output.dense." + name[5]
+
+            elif name[3] == "self_attn_layer_norm":
+                new_name += "self_output.layer_norm." + name[4]
+
+            elif name[3] == "fc2":
+                new_name += "output.dense." + name[4]
+
+            elif name[3] == "fc1":
+                new_name += "intermediate.dense." + name[4]
+
+            elif name[3] == "final_layer_norm":
+                new_name += "output.layer_norm." + name[4]
+
+            else:
+                raise NotImplementedError(".".join(name))
+
+            renamed_dict[new_name] = value.detach()
+
+        elif name[1] == "embed_tokens":
+            renamed_dict[".".join(name)] = value.detach()
+
+        elif name[1] == "embed_positions":
+            renamed_dict[".".join(name)] = value.detach()
+
+        elif name[1] == "emb_layer_norm":
+            new_name += ".embed_layer_norm." + name[2]
+            renamed_dict[new_name] = value.detach()
+
+        else:
+            raise NotImplementedError(".".join(name))
+
+
+    my_xlmr.load_state_dict(renamed_dict, strict=False)
+    my_xlmr.save(os.path.join(settings.get("ckp_dir"), "import"), file_name="xlmr.pth.tar", is_best=False)
+    my_xlmr.load_state_dict(renamed_dict, strict=True)

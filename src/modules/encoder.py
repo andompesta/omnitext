@@ -36,7 +36,7 @@ class Encoder(nn.Module):
             learned=self.learned_pos_embeddings
         )
 
-        self.emb_layer_norm = nn.LayerNorm(
+        self.embed_layer_norm = nn.LayerNorm(
             self.hidden_size,
             eps=conf.layer_norm_eps,
             elementwise_affine=True
@@ -62,7 +62,7 @@ class Encoder(nn.Module):
             hidden_state *= self.embed_scale
 
         hidden_state += self.embed_positions(input_ids, positions=position_ids)
-        hidden_state = self.emb_layer_norm(hidden_state)
+        hidden_state = self.embed_layer_norm(hidden_state)
         hidden_state = self.dropout(hidden_state)
 
 
