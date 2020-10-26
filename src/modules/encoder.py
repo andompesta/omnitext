@@ -20,70 +20,53 @@ class Encoder(nn.Module):
         self.learned_pos_embeddings = conf.learned_pos_embeddings
         self.num_hidden_layers = conf.num_hidden_layers
 
-        self.embed_tokens = TokenEmbedding(
-            num_embeddings=self.vocab_size,
-            embedding_dim=self.hidden_size,
-            padding_idx=self.pad_idx,
-            initializer_range=self.initializer_range,
-            scale=self.embedding_scale
-        )
-
-        self.embed_positions = PositionalEmbedding(
-            num_embeddings=self.max_position_embeddings,
-            embedding_dim=self.hidden_size,
-            padding_idx=self.pad_idx,
-            initializer_range=self.initializer_range,
-            learned=self.learned_pos_embeddings
-        )
-
-        self.embed_layer_norm = nn.LayerNorm(
-            self.hidden_size,
-            eps=conf.layer_norm_eps,
-            elementwise_affine=True
-        )
-
-        self.dropout = nn.Dropout(conf.hidden_dropout_prob)
+        # self.embed_tokens = TokenEmbedding(
+        #     num_embeddings=self.vocab_size,
+        #     embedding_dim=self.hidden_size,
+        #     padding_idx=self.pad_idx,
+        #     initializer_range=self.initializer_range,
+        #     scale=self.embedding_scale
+        # )
+        #
+        # self.embed_positions = PositionalEmbedding(
+        #     num_embeddings=self.max_position_embeddings,
+        #     embedding_dim=self.hidden_size,
+        #     padding_idx=self.pad_idx,
+        #     initializer_range=self.initializer_range,
+        #     learned=self.learned_pos_embeddings
+        # )
+        #
+        # self.embed_layer_norm = nn.LayerNorm(
+        #     self.hidden_size,
+        #     eps=conf.layer_norm_eps,
+        #     elementwise_affine=True
+        # )
+        #
+        # self.dropout = nn.Dropout(conf.hidden_dropout_prob)
 
         self.layer = nn.ModuleList([EncoderLayer(conf) for _ in range(self.num_hidden_layers)])
 
     def forward(
             self,
             input_ids: Tensor,
-            attention_mask: Tensor,
-            output_attentions: bool,
-            output_hidden_states: bool,
+            attention_mask: Optional[Tensor] = None,
             position_ids: Optional[Tensor] = None,
-    ) -> Tuple[Tensor, Optional[Tuple[Tensor]], Optional[Tuple[Tensor]]]:
+    ) -> Tensor:
 
         # compute embedding
-        hidden_state = self.embed_tokens(input_ids)
+        # hidden_state = self.embed_tokens(input_ids)
+        #
+        # if self.embed_scale is not None:
+        #     hidden_state *= self.embed_scale
+        #
+        # hidden_state += self.embed_positions(input_ids, positions=position_ids)
+        # hidden_state = self.embed_layer_norm(hidden_state)
+        # hidden_state = self.dropout(hidden_state)
 
-        if self.embed_scale is not None:
-            hidden_state *= self.embed_scale
-
-        hidden_state += self.embed_positions(input_ids, positions=position_ids)
-        hidden_state = self.embed_layer_norm(hidden_state)
-        hidden_state = self.dropout(hidden_state)
-
-
-        all_hidden_states = () if output_hidden_states else None
-        all_attentions = () if output_attentions else None
-
+        hidden_state = input_ids
         for i, layer_module in enumerate(self.layer):
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_state,)
-
-
-            layer_outputs = layer_module(
+            hidden_state = layer_module(
                 hidden_state=hidden_state,
                 attention_mask=attention_mask,
-                output_attentions=output_attentions,
             )
-            hidden_state = layer_outputs[0]
-            if output_attentions:
-                all_attentions = all_attentions + (layer_outputs[1],)
-
-        if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_state,)
-
-        return (hidden_state, all_hidden_states, all_attentions)
+        return hidden_state

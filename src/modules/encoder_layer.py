@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 
 from src.config import BaseConf
 from src.modules import (
+    LinearAttention,
     SelfOutput,
     SelfAttention,
     Intermediate,
@@ -12,7 +13,13 @@ from src.modules import (
 class EncoderLayer(nn.Module):
     def __init__(self, conf: BaseConf):
         super(EncoderLayer, self).__init__()
-        self.self_attn = SelfAttention(conf)
+        if conf.attention_type == "full":
+            self.attn = SelfAttention(conf)
+        elif conf.attention_type == "linear":
+            self.attn = LinearAttention(conf)
+        else:
+            raise NotImplementedError("attention type not yet implemented")
+
         self.self_output = SelfOutput(conf)
         self.intermediate = Intermediate(conf)
         self.output = Output(conf)
@@ -21,19 +28,18 @@ class EncoderLayer(nn.Module):
             self,
             hidden_state: Tensor,
             attention_mask: Optional[Tensor] = None,
-            output_attentions: bool = False,
-    ) -> Tuple[Tensor, Optional[Tensor]]:
+    ) -> Tensor:
         residual = hidden_state
-        self_attention_outputs = self.self_attn(hidden_state,
-                                                attention_mask=attention_mask,
-                                                output_attentions=output_attentions)
-        hidden_state = self_attention_outputs[0]
+        hidden_state = self.attn(
+            hidden_state,
+            attention_mask=attention_mask
+        )
+
         hidden_state = self.self_output(hidden_state, residual)
-        outputs = self_attention_outputs[1:]
 
         residual = hidden_state
         hidden_state = self.intermediate(hidden_state)
         hidden_state = self.output(hidden_state, residual)
-        outputs = (hidden_state, ) + outputs
+        outputs = hidden_state
         return outputs
 

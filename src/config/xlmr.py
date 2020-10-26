@@ -28,14 +28,17 @@ class XLMRobertaConfig(BaseConf):
             embedding_scale=None,
             learned_pos_embeddings=True,
             name="xlm-roberta",
+            attention_type="full",
+            kernel_type="favor",
+            kernel_size=256,
             **kwargs
     ):
-        super(XLMRobertaConfig, self).__init__(d_model=hidden_size,
-                                               n_head=num_attention_heads,
-                                               n_layer=num_hidden_layers,
-                                               name=name)
+        super(XLMRobertaConfig, self).__init__(name=name)
         self.vocab_size = vocab_size
         self.intermediate_size = intermediate_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
         self.hidden_act = hidden_act
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
@@ -47,6 +50,9 @@ class XLMRobertaConfig(BaseConf):
         self.pad_idx = pad_idx
         self.embedding_scale = embedding_scale
         self.learned_pos_embeddings = learned_pos_embeddings
+        self.attention_type = attention_type
+        self.kernel_type = kernel_type
+        self.kernel_size = kernel_size
 
         if "num_labels" in kwargs:
             self.num_labels = kwargs.get("num_labels")

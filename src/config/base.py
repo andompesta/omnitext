@@ -3,23 +3,8 @@ from src.utils import ensure_dir, save_data_to_json, load_data_from_json
 from abc import ABC, abstractmethod
 
 class BaseConf(ABC):
-    def __init__(self, d_model: int, n_head: int, n_layer: int, name: str):
-        self.d_model = d_model
-        self.n_head = n_head
-        self.n_layer = n_layer
+    def __init__(self, name: str):
         self.name = name
-
-    @property
-    def hidden_size(self):
-        return self.d_model
-
-    @property
-    def num_attention_heads(self):
-        return self.n_head
-
-    @property
-    def num_hidden_layers(self):
-        return self.n_layer
 
     def to_dict(self) -> dict:
         output = copy.deepcopy(self.__dict__)
