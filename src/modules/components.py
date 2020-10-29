@@ -1,8 +1,9 @@
 import torch
 from torch import nn, Tensor
 from typing import Optional, Tuple
+from einops import rearrange
 
-from .kernel import ELUkernel, Favor
+from .kernel import ELUkernel, SoftmaxKernel
 from .utils import ACT_NAME_TO_FN
 from src.config import BaseConf
 
@@ -28,24 +29,6 @@ class SelfAttention(nn.Module):
         self.dropout = nn.Dropout(conf.attention_probs_dropout_prob)
         self.scaling = self.attention_head_size ** -0.5
 
-    def transpose_for_scores(
-            self,
-            x: Tensor
-    ) -> Tensor:
-        """
-        transpose the scoring vectors
-        Args:
-            x: vector to transpose (N, L, H*HD)
-
-        Returns:
-            transposed vector on between sequence length and attention heads (N, L, H, HD).
-
-        """
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self. attention_head_size)
-        x = x.reshape(*new_x_shape)
-        # x = x.permute(0, 2, 1, 3).contiguous()
-        return x
-
     def forward(
             self,
             hidden_state: Tensor,
@@ -65,19 +48,15 @@ class SelfAttention(nn.Module):
         Returns:
 
         """
-        query_h = self.query(hidden_state)
+        query_h = rearrange(self.query(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
 
         if encoder_hidden_states is not None:
-            key_h = self.key(encoder_hidden_states)
-            value_h = self.value(encoder_hidden_states)
+            key_h = rearrange(self.key(encoder_hidden_states), "n l (h e) -> n l h e", h=self.num_attention_heads)
+            value_h = rearrange(self.value(encoder_hidden_states), "n l (h e) -> n l h e", h=self.num_attention_heads)
             attention_mask = encoder_attention_mask
         else:
-            key_h = self.key(hidden_state)
-            value_h = self.value(hidden_state)
-
-        query_h = self.transpose_for_scores(query_h)
-        key_h = self.transpose_for_scores(key_h)
-        value_h = self.transpose_for_scores(value_h)
+            key_h = rearrange(self.key(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
+            value_h = rearrange(self.value(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.einsum("nlhe,nshe->nhls", query_h, key_h)
@@ -89,12 +68,8 @@ class SelfAttention(nn.Module):
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
         attention_probs = self.dropout(attention_probs)
 
-        # context_h = torch.matmul(attention_probs, value_h)
-        # context_h = context_h.permute(0, 2, 1, 3).contiguous()
         context_h = torch.einsum("nhls,nshe->nlhe", attention_probs, value_h)
-
-        next_context_h_shape = context_h.size()[:-2] + (self.all_head_size,)
-        context_h = context_h.reshape(*next_context_h_shape)
+        context_h = rearrange(context_h, "n l h e -> n l (h e)")
 
         output = context_h
         return output
@@ -125,69 +100,46 @@ class LinearAttention(nn.Module):
         if conf.kernel_type is None:
             self.kernel = ELUkernel(self.attention_head_size)
         elif conf.kernel_type == "favor":
-            self.kernel = Favor(
+            self.kernel = SoftmaxKernel(
                 self.attention_head_size,
                 kernel_size=conf.kernel_size
             )
-
-    def transpose_for_scores(
-            self,
-            x: Tensor
-    ) -> Tensor:
-        """
-        transpose the scoring vectors
-        Args:
-            x: vector to transpose (N, L, H*HD)
-
-        Returns:
-            transposed vector on between sequence length and attention heads (N, L, H, HD).
-
-        """
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self. attention_head_size)
-        x = x.reshape(*new_x_shape)
-        return x
 
     def forward(
             self,
             hidden_state: Tensor,
             attention_mask: Optional[Tensor] = None,
-            encoder_hidden_states: Optional[Tensor] = None,
-            encoder_attention_mask: Optional[Tensor] = None,
+            resample: bool = True
     ) -> Tensor:
-        query_h = self.query(hidden_state)
+        query_h = rearrange(self.query(hidden_state), "n l (h d) -> n h l d", h=self.num_attention_heads)
+        key_h = rearrange(self.key(hidden_state), "n l (h d) -> n h l d", h=self.num_attention_heads)
+        value_h = rearrange(self.value(hidden_state), "n l (h d) -> n h l d", h=self.num_attention_heads)
 
-        if encoder_hidden_states is not None:
-            key_h = self.key(encoder_hidden_states)
-            value_h = self.value(encoder_hidden_states)
-            attention_mask = encoder_attention_mask
-        else:
-            key_h = self.key(hidden_state)
-            value_h = self.value(hidden_state)
+        query_h = self.kernel(
+            query_h,
+            is_query=True,
+            resample=resample
+        )
+        key_h = self.kernel(
+            key_h,
+            is_query=False,
+            resample=resample
+        )
 
-        query_h = self.transpose_for_scores(query_h)
-        key_h = self.transpose_for_scores(key_h)
-        value_h = self.transpose_for_scores(value_h)
-
-        # self.kernel.new_kernel()
-        query_h = self.kernel.forward_queries(query_h)
-        key_h = self.kernel.forward_keys(key_h)
-
-        # key_h = key_h * attention_mask[:, :, None, None]
+        if attention_mask is not None:
+            key_h = key_h * attention_mask
 
         # Compute the KV matrix, namely the dot product of keys and values so
         # that we never explicitly compute the attention matrix and thus
         # decrease the complexity
-        key_value = torch.einsum("nshk,nshe->nhek", key_h, value_h)
+        key_value = torch.einsum("nhsk,nhse->nhke", key_h, value_h)
 
         # Compute the normalizer
-        z_h = 1 / (torch.einsum("nlhk,nhk->nlh", query_h, key_h.sum(dim=1)) + self.eps)
+        z_h = torch.einsum("nhlk,nhk->nhl", query_h, key_h.sum(dim=-2))
 
         # Finally compute and return the new values
-        context_h = torch.einsum("nlhk,nhek,nlh->nlhe", query_h, key_value, z_h).contiguous()
-
-        next_context_h_shape = context_h.size()[:-2] + (self.all_head_size,)
-        context_h = context_h.reshape(*next_context_h_shape)
-
+        context_h = torch.einsum("nhke,nhlk,nhl->nhle", key_value, query_h, z_h)
+        context_h = rearrange(context_h, 'n h l e -> n l (h e)')
         return context_h
 
 

@@ -5,3 +5,4 @@ fastapi==0.60.1
 pydantic==1.6.1
 uvicorn==0.11.8
 transformers[torch]==3.4.0
+einops==0.3.0

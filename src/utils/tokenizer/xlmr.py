@@ -200,7 +200,7 @@ if __name__ == '__main__':
     from dynaconf import settings
 
     xlmr = torch.hub.load('pytorch/fairseq', 'xlmr.large')
-    tok = Tokenizer(os.path.join(settings.get("ckp_dir"), "import", "sentencepiece.bpe.model"))
+    tok = Tokenizer(os.path.join(settings.get("ckp_dir"), "pre-trained", "sentencepiece.bpe.model"))
 
     en_tokens = xlmr.encode('Hello world!')
     assert en_tokens.tolist() == [0, 35378, 8999, 38, 2]

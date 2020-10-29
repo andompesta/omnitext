@@ -40,6 +40,46 @@ def orthogonal_random_matrix_(w: torch.Tensor):
         start += rows
 
 
+
+def gaussian_orthogonal_random_matrix(
+        nb_rows: int,
+        nb_columns: int,
+        scaling: float = 0,
+        device: Optional[torch.device] = None
+) -> torch.Tensor:
+    nb_full_blocks = int(nb_rows / nb_columns)
+    block_list = []
+    for _ in range(nb_full_blocks):
+        q = orthogonal_matrix_chunk(nb_columns, device=device)
+        block_list.append(q)
+
+    remaining_rows = nb_rows - nb_full_blocks * nb_columns
+    if remaining_rows > 0:
+        q = orthogonal_matrix_chunk(nb_columns, device=device)
+        block_list.append(q[:remaining_rows])
+
+    final_matrix = torch.cat(block_list)
+
+    if scaling == 0:
+        multiplier = torch.randn((nb_rows, nb_columns), device=device).norm(dim=1)
+    elif scaling == 1:
+        multiplier = sqrt((float(nb_columns))) * torch.ones((nb_rows,), device=device)
+    else:
+        raise ValueError(f'Invalid scaling {scaling}')
+
+    return torch.diag(multiplier) @ final_matrix
+
+
+def orthogonal_matrix_chunk(
+        cols: int,
+        device: torch.device = None
+) -> torch.Tensor:
+    unstructured_block = torch.randn((cols, cols), device=device)
+    q, _ = torch.qr(unstructured_block.cpu(), some=True)
+    q = q.to(device)
+    return q.t()
+
+
 class RandomFourierFeatures(Kernel):
     """Random Fourier Features for the RBF kernel according to [1].
     [1]: "Weighted Sums of Random Kitchen Sinks: Replacing minimization with
@@ -85,7 +125,8 @@ class RandomFourierFeatures(Kernel):
 
     def forward(
             self,
-            x: torch.Tensor
+            x: torch.Tensor,
+            **kwargs
     ) -> torch.Tensor:
         x = x * sqrt(self.softmax_temp)
         u = x.unsqueeze(-2).matmul(self.omega).squeeze(-2)
@@ -133,15 +174,15 @@ class SmoothedRandomFourierFeatures(RandomFourierFeatures):
         return torch.cat([y, smoothing], dim=-1)
 
 
-class Favor(RandomFourierFeatures):
+class SoftmaxKernel(Kernel):
     """Positive orthogonal random features that approximate the softmax kernel.
     Basically implementation of Lemma 1 from "Rethinking Attention with
     Performers".
     Arguments
     ---------
-        query_dimensions: int, The input query dimensions in order to sample
+        head_size: int, The input query dimensions in order to sample
                           the noise matrix
-        n_dims: int, The size of the feature map (should be divisible by 2)
+        kernel_size: int, The size of the feature map (should be divisible by 2)
                 (default: query_dimensions)
         softmax_temp: float, The temerature for the softmax approximation
                      (default: 1/sqrt(query_dimensions))
@@ -158,64 +199,116 @@ class Favor(RandomFourierFeatures):
             self,
             head_size: int,
             kernel_size: Optional[int] = None,
-            softmax_temp: Optional[float] = None,
+            ortho_scaling: Optional[float] = 0,
+            causal: bool = False,
             orthogonal: bool = True,
-            stabilize: bool = False
+            eps: float = 1e-6
     ):
-        super(Favor, self).__init__(
-            head_size,
-            kernel_size,
-            softmax_temp=softmax_temp,
-            orthogonal=orthogonal
+        super(SoftmaxKernel, self).__init__(head_size)
+        kernel_size = int(self.head_size * log(self.head_size)) if kernel_size is None else kernel_size
+        self.kernel_size = kernel_size
+        self.ortho_scaling = ortho_scaling
+        self.causal = causal
+        self.orthogonal = orthogonal
+        self.eps = eps
+
+        self.register_buffer(
+            "omega",
+            self.new_kernel()
         )
-        self.stabilize = stabilize
 
-    def _check_sequence_length(self, x):
-        """Check that the 2nd dimension is larger than the 3rd as a heuristic
-        that the sequence length will be larger than the number of heads. If
-        not simply warn of a possible bug."""
-        if len(x.shape) != 4:
-            warnings.warn(("Favor.stabilize is set to True but the input "
-                           "feature does not have the shape (N, L, H, D) "
-                           "which may result in unexpected behaviour"))
+        if self.causal:
+            raise NotImplementedError("linear causal attention not yet implemented")
 
-        if x.shape[1] < x.shape[2]:
-            warnings.warn(("Favor.stabilize is set to True but the 2nd "
-                           "dimension of the input is smaller than the 3rd "
-                           "which could indicate that the sequence length and "
-                           "the heads are flipped. This may result in incorrect "
-                           "behaviour. The shape of the input is "
-                           "{!r}.").format(x.shape))
+    def new_kernel(
+            self,
+            device: Optional[torch.device] = "cpu"
+    ):
+        return gaussian_orthogonal_random_matrix(
+            self.kernel_size,
+            self.head_size,
+            scaling=self.ortho_scaling,
+            device=device
+        )
+
+    def softmax_kernel(
+            self,
+            x: torch.Tensor,
+            *,
+            is_query: bool,
+            normalize_data=True,
+            device=None):
+
+        if normalize_data:
+            x_norm = 1.0 / (x.shape[-1] ** 0.25)
+        else:
+            x_norm = 1.0
+
+        ratio = 1.0 / (self.omega.shape[0] ** 0.5)
+
+        data_mod_shape = x.shape[:(len(x.shape) - 2)] + self.omega.shape
+        data_thick_random_matrix = torch.zeros(data_mod_shape, device=device) + self.omega
+
+        data_dash = torch.einsum('...id,...jd->...ij', (x_norm * x), data_thick_random_matrix)
+
+        diag_x = x ** 2
+        diag_x = torch.sum(diag_x, dim=-1)
+        diag_x = (diag_x / 2.0) * (x_norm ** 2)
+        diag_x = diag_x.unsqueeze(dim=-1)
+
+        if is_query:
+            data_dash = ratio * (
+                    torch.exp(data_dash - diag_x -
+                              torch.max(data_dash, dim=-1, keepdim=True).values) + self.eps)
+        else:
+            data_dash = ratio * (
+                    torch.exp(data_dash - diag_x - torch.max(data_dash)) + self.eps)
+
+        return data_dash
 
     def forward(
             self,
-            x: torch.Tensor
+            x: torch.Tensor,
+            is_query: bool,
+            resample: bool = True,
     ) -> torch.Tensor:
-        x = x * sqrt(self.softmax_temp)
-        norm_x_squared = torch.einsum("...d,...d->...", x, x).unsqueeze(-1)
-        u = x.unsqueeze(-2).matmul(self.omega).squeeze(-2)
+        device = x.device
 
-        # Compute the offset for the exponential such that h(x) is multiplied
-        # in logspace. In particular, we multiply with exp(-norm_x_squared/2)
-        # and 1/sqrt(self.n_dims)
-        offset = norm_x_squared * 0.5 + 0.5 * log(self.kernel_size)
+        if resample:
+            self.omega = self.new_kernel(device=device)
 
-        # If stabilize is True then add the max norm per sequence in order to
-        # ensure that exp_u1 and exp_u2 will be <1.
+        return self.softmax_kernel(
+            x,
+            is_query=is_query,
+            device=device
+        )
+
+
+        # x = x * sqrt(self.softmax_temp)
+        # norm_x_squared = torch.einsum("...d,...d->...", x, x).unsqueeze(-1)
+        # u = x.unsqueeze(-2).matmul(self.omega).squeeze(-2)
         #
-        # NOTE: This is the only part of this feature map that assumes the
-        #       2nd dimension is the sequence length. We call the
-        #       _check_sequence_length dimension function to be able to catch
-        #       some possible bugs ahead of time.
-        if self.stabilize:
-            self._check_sequence_length(norm_x_squared)
-            offset = offset + norm_x_squared.max(1, keepdim=True)[0]
-
-        exp_u1 = torch.exp(u - offset)
-        exp_u2 = torch.exp(-u - offset)
-        phi = torch.cat([exp_u1, exp_u2], dim=-1)
-
-        return phi
+        # # Compute the offset for the exponential such that h(x) is multiplied
+        # # in logspace. In particular, we multiply with exp(-norm_x_squared/2)
+        # # and 1/sqrt(self.n_dims)
+        # offset = norm_x_squared * 0.5 + 0.5 * log(self.kernel_size)
+        #
+        # # If stabilize is True then add the max norm per sequence in order to
+        # # ensure that exp_u1 and exp_u2 will be <1.
+        # #
+        # # NOTE: This is the only part of this feature map that assumes the
+        # #       2nd dimension is the sequence length. We call the
+        # #       _check_sequence_length dimension function to be able to catch
+        # #       some possible bugs ahead of time.
+        # if stabilize:
+        #     self._check_sequence_length(norm_x_squared)
+        #     offset = offset + norm_x_squared.max(1, keepdim=True)[0]
+        #
+        # exp_u1 = torch.exp(u - offset)
+        # exp_u2 = torch.exp(-u - offset)
+        # phi = torch.cat([exp_u1, exp_u2], dim=-1)
+        #
+        # return phi
 
 
 class GeneralizedRandomFeatures(RandomFourierFeatures):

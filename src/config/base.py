@@ -1,6 +1,6 @@
 import copy
 from src.utils import ensure_dir, save_data_to_json, load_data_from_json
-from abc import ABC, abstractmethod
+from abc import ABC
 
 class BaseConf(ABC):
     def __init__(self, name: str):
@@ -20,4 +20,4 @@ class BaseConf(ABC):
     @classmethod
     def load(cls, path_: str):
         json_obj = load_data_from_json(path_)
-        return cls(**json_obj)
+        return cls(**dict(json_obj))

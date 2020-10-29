@@ -3,6 +3,7 @@ from .embedding import PositionalEmbedding, TokenEmbedding
 from .encoder_layer import EncoderLayer
 from .encoder import Encoder
 from .utils import BaseModel
+from .heads import ClassificationHead, LMHead
 __all__ = [
     "SelfAttention",
     "LinearAttention",
@@ -13,5 +14,7 @@ __all__ = [
     "TokenEmbedding",
     "EncoderLayer",
     "Encoder",
-    "BaseModel"
+    "BaseModel",
+    "ClassificationHead",
+    "LMHead"
 ]

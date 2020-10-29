@@ -1,4 +1,5 @@
 [default]
-ckp_dir = '/workspace/omnitext/checkpoint'
-run_dir = '/workspace/omnitext/run'
-data_dir = '/workspace/omnitext/data'
+ckp_dir = '/home/andompesta/Projects/omnitext/checkpoint'
+run_dir = '/home/andompesta/Projects/omnitext/run'
+data_dir = '/home/andompesta/Projects/omnitext/data'
+exp_dir = '/home/andompesta/Projects/omnitext/export'

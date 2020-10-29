@@ -1,8 +1,8 @@
 from .base import ELUkernel
-from .fourier import Favor, RandomFourierFeatures
+from .fourier import SoftmaxKernel, RandomFourierFeatures
 
 __all__ = [
     "ELUkernel",
-    "Favor",
+    "SoftmaxKernel",
     "RandomFourierFeatures"
 ]

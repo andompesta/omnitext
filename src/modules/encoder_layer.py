@@ -18,7 +18,7 @@ class EncoderLayer(nn.Module):
         elif conf.attention_type == "linear":
             self.attn = LinearAttention(conf)
         else:
-            raise NotImplementedError("attention type not yet implemented")
+            raise NotImplementedError('Not implemented yet. Support only "full" and "linear"')
 
         self.self_output = SelfOutput(conf)
         self.intermediate = Intermediate(conf)
@@ -28,11 +28,13 @@ class EncoderLayer(nn.Module):
             self,
             hidden_state: Tensor,
             attention_mask: Optional[Tensor] = None,
+            **kwargs
     ) -> Tensor:
         residual = hidden_state
         hidden_state = self.attn(
             hidden_state,
-            attention_mask=attention_mask
+            attention_mask=attention_mask,
+            **kwargs
         )
 
         hidden_state = self.self_output(hidden_state, residual)
