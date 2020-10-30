@@ -98,41 +98,36 @@ class RobertaEncoder(Encoder):
         extended_attention_mask = extended_attention_mask * -10000.0
         return extended_attention_mask
 
-class RobertaMaskedLanguageModel(BaseModel):
+
+class RobertaMaskedLanguageModel(RobertaEncoder, BaseModel):
     def __init__(self, conf: RobertaConfig):
         conf.name += "-mlm"
         super(RobertaMaskedLanguageModel, self).__init__(conf)
-
-        self.sentence_encoder = RobertaEncoder(conf)
         self.lm_head = LMHead(conf)
-
         self.tie_weights()
         self.init_weights()
 
     def forward(
             self,
             input_ids: Tensor,
-            position_ids: Optional[Tensor],
             attention_mask: Optional[Tensor] = None,
-            output_attentions: bool = False,
-            output_hidden_states: bool = False,
-    ) -> Tuple[Tensor, Tensor, Optional[Tuple[Tensor]], Optional[Tuple[Tensor]]]:
+            position_ids: Optional[Tensor] = None,
+            **kwargs
+    ) -> Tuple[Tensor, Tensor]:
 
         enc_outputs = self.sentence_encoder(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states
+            **kwargs
         )
-        hidden_state = enc_outputs[0]
-        logits = self.lm_head(hidden_state)
+        logits = self.lm_head(enc_outputs)
 
-        outputs = (logits, hidden_state, enc_outputs[1], enc_outputs[2])
+        outputs = (logits, enc_outputs)
         return outputs
 
     def _init_weights(self, module: torch.nn.Module):
-        if hasattr(module, "_init_weights") and not isinstance(module, XLMMaskedLanguageModel):
+        if hasattr(module, "_init_weights") and not isinstance(module, RobertaMaskedLanguageModel):
             module._init_weights()
             print("_init_weights for {}".format(module))
 
