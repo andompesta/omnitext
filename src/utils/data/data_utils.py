@@ -143,7 +143,7 @@ def batch_by_size(
             *required_batch_size_multiple* will be ignored (default: None).
     """
     try:
-        from fairseq.data.data_utils_fast import (
+        from .data_utils_fast import (
             batch_by_size_fast, batch_fixed_shapes_fast,
         )
     except ImportError:

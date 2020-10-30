@@ -82,12 +82,10 @@ class EpochBatchIterating(ABC):
     def __len__(self) -> int:
         raise NotImplementedError
 
-    @abstractmethod
     @property
     def next_epoch_idx(self):
-        ...
+        raise NotImplementedError()
 
-    @abstractmethod
     def next_epoch_itr(self, shuffle=True, fix_batches_to_gpus=False):
         """Return a new iterator over the dataset.
         Args:
@@ -105,7 +103,6 @@ class EpochBatchIterating(ABC):
         ...
 
     @abstractmethod
-    @property
     def iterations_in_epoch(self) -> int:
         """The number of consumed batches in the current epoch."""
         ...

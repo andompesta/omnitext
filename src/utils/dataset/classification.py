@@ -18,14 +18,14 @@ def classify_pad_bath(ids: List[List[int]], sizes: List[int], pad: int) -> List[
     """
 
     max_len = max(sizes)
-    collector = []
-    for seq, size in zip(ids, sizes):
-        seq = np.array(seq + [pad] * (max_len - size))
-        collector.append(seq)
-    return collector
+    batch_ids = np.array([np.array(seq + [pad] * (max_len - size)) for seq, size in zip(ids, sizes)])
+    mask = np.not_equal(batch_ids, pad).astype(int)
+    incremental_indices = np.cumsum(mask, axis=1) * mask
+    batch_pos = incremental_indices + pad
+    return batch_ids, batch_pos
 
 def classify_collate(batch_samples: Tuple[List[List[int]], List[int], List[int]], tensor_type, pad: int) -> \
-    Tuple[torch.tensor, torch.tensor]:
+    Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     collate function used to pad a batch of sampled examples
     :param batch_samples: examples to pad
@@ -34,8 +34,8 @@ def classify_collate(batch_samples: Tuple[List[List[int]], List[int], List[int]]
     :return:
     """
     input_ids, sizes, labels = zip(*batch_samples)
-    input_ids = classify_pad_bath(input_ids, sizes, pad)
-    return tensor_type(input_ids), tensor_type(labels)
+    input_ids, position_ids = classify_pad_bath(input_ids, sizes, pad)
+    return tensor_type(input_ids), tensor_type(position_ids), tensor_type(labels)
 
 
 class ClassifyDataset(OmniDataset):
@@ -131,4 +131,32 @@ def get_classify_dataset(path_, group_names, max_tokens_per_batch: int,
 
 
 if __name__ == '__main__':
+    import os
+    from dynaconf import settings
+    from transformers import RobertaTokenizerFast
+
     print("implement test if needed")
+
+    dataset_gen = get_classify_dataset(
+        os.path.join(settings.get("data_dir"), "classification", "imdb.pt"),
+        "train",
+        4000,
+        1,
+        max_sentence_length=512
+    )
+
+    print(len(dataset_gen))
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+
+    for epoch in range(1):
+        print(f"epoch iterator - {epoch} - {dataset_gen.epoch}")
+
+        iter = dataset_gen.next_epoch_itr(shuffle=True)
+
+        for idx, batch in enumerate(iter):
+            ids, pos, labels = batch
+            for seq, label in zip(
+                ids.numpy().tolist(),
+                labels.numpy().tolist()
+            ):
+                print(f"{idx} \t {tokenizer.decode(seq)} \t {label}")
