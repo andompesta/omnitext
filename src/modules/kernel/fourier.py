@@ -9,63 +9,42 @@ and the traditional random Fourier features that approximate the RBF kernel.
 """
 
 from math import sqrt, log
-import warnings
 from typing import Optional
+from einops import repeat
 
 import torch
 
 from .base import Kernel
 
 
-def orthogonal_random_matrix_(w: torch.Tensor):
-    """Initialize the matrix w in-place to compute orthogonal random features.
-    The matrix is initialized such that its columns are orthogonal to each
-    other (in groups of size `rows`) and their norms is drawn from the
-    chi-square distribution with `rows` degrees of freedom (namely the norm of
-    a `rows`-dimensional vector distributed as N(0, I)).
-    Arguments
-    ---------
-        w: float tensor of size (rows, columns)
-    """
-    rows, columns = w.shape
-    start = 0
-    while start < columns:
-        end = min(start+rows, columns)
-        block = torch.randn(rows, rows, device=w.device)
-        norms = torch.sqrt(torch.einsum("ab,ab->a", block, block))
-        Q, _ = torch.qr(block)
-        w[:, start:end] = (
-            Q[:, :end-start] * norms[None, :end-start]
-        )
-        start += rows
-
-
-
-def gaussian_orthogonal_random_matrix(
-        nb_rows: int,
-        nb_columns: int,
+def orthogonal_random_matrix_(
+        num_rows: int,
+        num_columns: int,
         scaling: float = 0,
         device: Optional[torch.device] = None
-) -> torch.Tensor:
-    nb_full_blocks = int(nb_rows / nb_columns)
+):
+    num_full_blocks = int(num_rows / num_columns)
     block_list = []
-    for _ in range(nb_full_blocks):
-        q = orthogonal_matrix_chunk(nb_columns, device=device)
+
+    for _ in range(num_full_blocks):
+        q = orthogonal_matrix_chunk(num_columns, device)
         block_list.append(q)
 
-    remaining_rows = nb_rows - nb_full_blocks * nb_columns
+
+    remaining_rows = num_rows - (num_full_blocks * num_columns)
     if remaining_rows > 0:
-        q = orthogonal_matrix_chunk(nb_columns, device=device)
+        q = orthogonal_matrix_chunk(num_columns, device)
         block_list.append(q[:remaining_rows])
 
     final_matrix = torch.cat(block_list)
 
     if scaling == 0:
-        multiplier = torch.randn((nb_rows, nb_columns), device=device).norm(dim=1)
+        multiplier = torch.randn((num_rows, num_columns), device=device)\
+            .norm(dim=1)
     elif scaling == 1:
-        multiplier = sqrt((float(nb_columns))) * torch.ones((nb_rows,), device=device)
+        multiplier = sqrt((float(num_columns))) * torch.ones((num_rows,), device=device)
     else:
-        raise ValueError(f'Invalid scaling {scaling}')
+        raise ValueError(f"Invalid scaling {scaling}")
 
     return torch.diag(multiplier) @ final_matrix
 
@@ -202,7 +181,7 @@ class SoftmaxKernel(Kernel):
             ortho_scaling: Optional[float] = 0,
             causal: bool = False,
             orthogonal: bool = True,
-            eps: float = 1e-6
+            eps: float = 1e-4
     ):
         super(SoftmaxKernel, self).__init__(head_size)
         kernel_size = int(self.head_size * log(self.head_size)) if kernel_size is None else kernel_size
@@ -213,7 +192,7 @@ class SoftmaxKernel(Kernel):
         self.eps = eps
 
         self.register_buffer(
-            "omega",
+            "omegas",
             self.new_kernel()
         )
 
@@ -224,91 +203,47 @@ class SoftmaxKernel(Kernel):
             self,
             device: Optional[torch.device] = "cpu"
     ):
-        return gaussian_orthogonal_random_matrix(
+        return orthogonal_random_matrix_(
             self.kernel_size,
             self.head_size,
             scaling=self.ortho_scaling,
             device=device
         )
 
-    def softmax_kernel(
-            self,
-            x: torch.Tensor,
-            *,
-            is_query: bool,
-            normalize_data=True,
-            device=None):
 
-        if normalize_data:
-            x_norm = 1.0 / (x.shape[-1] ** 0.25)
-        else:
-            x_norm = 1.0
-
-        ratio = 1.0 / (self.omega.shape[0] ** 0.5)
-
-        data_mod_shape = x.shape[:(len(x.shape) - 2)] + self.omega.shape
-        data_thick_random_matrix = torch.zeros(data_mod_shape, device=device) + self.omega
-
-        data_dash = torch.einsum('...id,...jd->...ij', (x_norm * x), data_thick_random_matrix)
-
-        diag_x = x ** 2
-        diag_x = torch.sum(diag_x, dim=-1)
-        diag_x = (diag_x / 2.0) * (x_norm ** 2)
-        diag_x = diag_x.unsqueeze(dim=-1)
-
-        if is_query:
-            data_dash = ratio * (
-                    torch.exp(data_dash - diag_x -
-                              torch.max(data_dash, dim=-1, keepdim=True).values) + self.eps)
-        else:
-            data_dash = ratio * (
-                    torch.exp(data_dash - diag_x - torch.max(data_dash)) + self.eps)
-
-        return data_dash
 
     def forward(
             self,
             x: torch.Tensor,
             is_query: bool,
-            resample: bool = True,
+            normalize_data: bool = True,
     ) -> torch.Tensor:
-        device = x.device
+        b, h, *_ = x.shape
 
-        if resample:
-            self.omega = self.new_kernel(device=device)
+        if normalize_data:
+            x_norm = 1. / (x.shape[-1] ** 0.25)
+        else:
+            x_norm = 1.
 
-        return self.softmax_kernel(
-            x,
-            is_query=is_query,
-            device=device
-        )
+        ratio = 1. / (self.omegas.shape[0] ** 0.5)
 
+        projection_matrix = repeat(self.omegas, 'j d -> b h j d', b=b, h=h)
 
-        # x = x * sqrt(self.softmax_temp)
-        # norm_x_squared = torch.einsum("...d,...d->...", x, x).unsqueeze(-1)
-        # u = x.unsqueeze(-2).matmul(self.omega).squeeze(-2)
-        #
-        # # Compute the offset for the exponential such that h(x) is multiplied
-        # # in logspace. In particular, we multiply with exp(-norm_x_squared/2)
-        # # and 1/sqrt(self.n_dims)
-        # offset = norm_x_squared * 0.5 + 0.5 * log(self.kernel_size)
-        #
-        # # If stabilize is True then add the max norm per sequence in order to
-        # # ensure that exp_u1 and exp_u2 will be <1.
-        # #
-        # # NOTE: This is the only part of this feature map that assumes the
-        # #       2nd dimension is the sequence length. We call the
-        # #       _check_sequence_length dimension function to be able to catch
-        # #       some possible bugs ahead of time.
-        # if stabilize:
-        #     self._check_sequence_length(norm_x_squared)
-        #     offset = offset + norm_x_squared.max(1, keepdim=True)[0]
-        #
-        # exp_u1 = torch.exp(u - offset)
-        # exp_u2 = torch.exp(-u - offset)
-        # phi = torch.cat([exp_u1, exp_u2], dim=-1)
-        #
-        # return phi
+        data_dash = torch.einsum('...id,...jd->...ij', (x_norm * x), projection_matrix)
+
+        diag_x = torch.sum(x ** 2, dim=-1)
+        diag_x = ((diag_x / 2.0) * (x_norm ** 2)).unsqueeze(dim=-1)
+
+        if is_query:
+            data_dash = ratio * (
+                torch.exp(data_dash - diag_x - torch.max(data_dash, dim=-1, keepdim=True).values) + self.eps
+            )
+        else:
+            data_dash = ratio * (
+                    torch.exp(data_dash - diag_x - torch.max(data_dash)) + self.eps
+            )
+
+        return data_dash
 
 
 class GeneralizedRandomFeatures(RandomFourierFeatures):

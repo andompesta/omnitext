@@ -2,28 +2,42 @@ import torch
 import numpy as np
 from sklearn.metrics import precision_recall_fscore_support
 from torch import nn, Tensor, optim
-from typing import Tuple
+from typing import Tuple, Optional
 from src.tasks import OmniTask
 from src.utils.data import OmniDataset
+from argparse import Namespace
+
 
 class ClassificationTask(OmniTask):
     def __init__(
             self,
             name: str,
-            args,
-            global_step: int = 0,
-            pad_idx: int = 1
+            args: Namespace,
+            pad_token_id: int,
+            eos_token_id: Optional[int]
     ):
-        super(ClassificationTask, self).__init__(name, args, global_step)
-        self.pad_idx = pad_idx
+        super(ClassificationTask, self).__init__(name, args)
+        self.pad_token_id = pad_token_id
+        self.eos_token_id = eos_token_id
 
-    def get_loss_fn(self, pad_idx: int, reduction='none'):
+    @classmethod
+    def get_loss_fn(
+            cls,
+            reduction='none',
+            ignore_index=-1
+    ):
         return nn.CrossEntropyLoss(
             reduction=reduction,
-            ignore_index=pad_idx
+            ignore_index=ignore_index
         )
 
-    def compute_correct(self, logits: Tensor, labels: Tensor, **kwargs) -> Tuple[Tensor, int]:
+    @classmethod
+    def compute_correct(
+            cls,
+            logits: Tensor,
+            labels: Tensor,
+            **kwargs
+    ) -> Tuple[Tensor, int]:
         with torch.no_grad():
             pred_idx = logits.argmax(1)
             n_correct = pred_idx.eq(labels).sum().item()
@@ -41,7 +55,7 @@ class ClassificationTask(OmniTask):
     ) -> Tuple[float, float]:
         model.train()
         optimizer.zero_grad()
-        loss_fn = self.get_loss_fn(self.pad_idx)
+        loss_fn = self.get_loss_fn()
 
         total_loss = 0
         n_pred_total = 0

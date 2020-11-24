@@ -33,8 +33,7 @@ class SelfAttention(nn.Module):
             self,
             hidden_state: Tensor,
             attention_mask: Optional[Tensor] = None,
-            encoder_hidden_states: Optional[Tensor] = None,
-            encoder_attention_mask: Optional[Tensor] = None,
+            **kwargs
         ) -> Tensor:
         """
 
@@ -49,18 +48,11 @@ class SelfAttention(nn.Module):
 
         """
         query_h = rearrange(self.query(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
-
-        if encoder_hidden_states is not None:
-            key_h = rearrange(self.key(encoder_hidden_states), "n l (h e) -> n l h e", h=self.num_attention_heads)
-            value_h = rearrange(self.value(encoder_hidden_states), "n l (h e) -> n l h e", h=self.num_attention_heads)
-            attention_mask = encoder_attention_mask
-        else:
-            key_h = rearrange(self.key(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
-            value_h = rearrange(self.value(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
+        key_h = rearrange(self.key(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
+        value_h = rearrange(self.value(hidden_state), "n l (h e) -> n l h e", h=self.num_attention_heads)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.einsum("nlhe,nshe->nhls", query_h, key_h)
-        # attention_scores = torch.matmul(query_h, key_h.transpose(-1, -2))
         attention_scores = attention_scores * self.scaling
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
@@ -115,15 +107,16 @@ class LinearAttention(nn.Module):
         key_h = rearrange(self.key(hidden_state), "n l (h d) -> n h l d", h=self.num_attention_heads)
         value_h = rearrange(self.value(hidden_state), "n l (h d) -> n h l d", h=self.num_attention_heads)
 
+        if resample:
+            self.kernel.omegas = self.kernel.new_kernel(query_h.device)
+
         query_h = self.kernel(
             query_h,
             is_query=True,
-            resample=resample
         )
         key_h = self.kernel(
             key_h,
-            is_query=False,
-            resample=resample
+            is_query=False
         )
 
         if attention_mask is not None:
@@ -135,7 +128,7 @@ class LinearAttention(nn.Module):
         key_value = torch.einsum("nhsk,nhse->nhke", key_h, value_h)
 
         # Compute the normalizer
-        z_h = torch.einsum("nhlk,nhk->nhl", query_h, key_h.sum(dim=-2))
+        z_h = 1. / torch.einsum("nhlk,nhk->nhl", query_h, key_h.sum(dim=-2))
 
         # Finally compute and return the new values
         context_h = torch.einsum("nhke,nhlk,nhl->nhle", key_value, query_h, z_h)

@@ -27,9 +27,11 @@ class OmniDataset(Dataset):
         return False
 
 
-    def __init__(self, pad: int, shuffle: bool = True):
-        self.pad = pad
+    def __init__(self, pad_token_id: int, eos_token_id: int, shuffle: bool = True):
+        self.pad_token_id = pad_token_id
+        self.eos_token_id = eos_token_id
         self.shuffle = shuffle
+        self.epoch = 1
 
     def __getitem__(self, item):
         raise NotImplementedError
@@ -69,7 +71,7 @@ class OmniDataset(Dataset):
         Return an ordered list of indices. Batches are constructed based on this order.
         :return: array of index
         """
-        return np.arange(len(self)).tolist()
+        return list(range(len(self)))
 
     @abstractmethod
     def prefetch(self, indices: List[int]):
@@ -79,3 +81,6 @@ class OmniDataset(Dataset):
         :return:
         """
         ...
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch

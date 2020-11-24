@@ -17,7 +17,7 @@ class Encoder(nn.Module):
         self.initializer_range = conf.initializer_range
         self.embedding_scale = conf.embedding_scale
         self.max_position_embeddings = conf.max_position_embeddings
-        self.learned_pos_embeddings = conf.learned_pos_embeddings
+        self.pos_embeddings_type = conf.pos_embeddings_type
         self.num_hidden_layers = conf.num_hidden_layers
 
         self.embed_tokens = TokenEmbedding(
@@ -33,7 +33,7 @@ class Encoder(nn.Module):
             embedding_dim=self.hidden_size,
             padding_idx=self.pad_idx,
             initializer_range=self.initializer_range,
-            learned=self.learned_pos_embeddings
+            type=self.pos_embeddings_type
         )
 
         self.embed_layer_norm = nn.LayerNorm(

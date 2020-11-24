@@ -28,7 +28,7 @@ class RobertaConfig(BaseConf):
             bos_idx=0,
             eos_idx=2,
             embedding_scale=None,
-            learned_pos_embeddings=True,
+            pos_embeddings_type="learned",
             attention_type="full",
             kernel_type="favor",
             kernel_size=256,
@@ -52,13 +52,14 @@ class RobertaConfig(BaseConf):
         self.bos_idx = bos_idx
         self.eos_idx = eos_idx
         self.embedding_scale = embedding_scale
-        self.learned_pos_embeddings = learned_pos_embeddings
+        self.pos_embeddings_type = pos_embeddings_type
         self.attention_type = attention_type
         self.kernel_type = kernel_type
         self.kernel_size = kernel_size
 
-        if "num_labels" in kwargs:
-            self.num_labels = kwargs.get("num_labels")
+
+        for n, v in kwargs.items():
+            setattr(self, n, v)
 
 
 if __name__ == '__main__':

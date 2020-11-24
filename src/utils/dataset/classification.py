@@ -8,7 +8,11 @@ from src.utils.data import data_utils
 from src.utils.data import iterators
 
 
-def classify_pad_bath(ids: List[List[int]], sizes: List[int], pad: int) -> List[np.array]:
+def classify_pad_bath(
+        ids: List[List[int]],
+        sizes: List[int],
+        pad: int
+) -> Tuple[np.array, np.array]:
     """
     Pad the instances to max length in the batch
     :param ids: sequences to pad
@@ -24,8 +28,11 @@ def classify_pad_bath(ids: List[List[int]], sizes: List[int], pad: int) -> List[
     batch_pos = incremental_indices + pad
     return batch_ids, batch_pos
 
-def classify_collate(batch_samples: Tuple[List[List[int]], List[int], List[int]], tensor_type, pad: int) -> \
-    Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def classify_collate(
+        batch_samples: Tuple[List[List[int]], List[int], List[int]],
+        tensor_type,
+        pad: int
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     collate function used to pad a batch of sampled examples
     :param batch_samples: examples to pad
@@ -50,21 +57,33 @@ class ClassifyDataset(OmniDataset):
     def __len__(self):
         return len(self.input_ids)
 
-    def __getitem__(self, item) -> Tuple[List[int], int, int]:
+    def __getitem__(
+            self,
+            item
+    ) -> Tuple[List[int], int, int]:
         ids = self.input_ids[item]
         size = self.sizes[item]
         label = self.labels[item]
 
         return (ids, size, label)
 
-    def num_tokens(self, index: int):
+    def num_tokens(
+            self,
+            index: int
+    ) ->int:
         return self.sizes[index]
 
-    def size(self, index: int):
+    def size(
+            self,
+            index: int
+    ) -> int:
         return self.sizes[index]
 
-    def collate(self, samples: Tuple[List[List[int]], List[int], List[int]]):
-        return classify_collate(samples, self.tensor_type, self.pad)
+    def collate(
+            self,
+            samples: Tuple[List[List[int]], List[int], List[int]]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return classify_collate(samples, self.tensor_type, self.pad_token_id)
 
     def ordered_indices(self) -> List[int]:
         if self.shuffle:
@@ -77,9 +96,6 @@ class ClassifyDataset(OmniDataset):
         self.input_ids.prefetch(indices)
         self.labels.prefetch(indices)
         self.sizes.prefetch(indices)
-
-    def set_epoch(self, epoch):
-        self.epoch = epoch
 
 
 def get_classify_dataset(path_, group_names, max_tokens_per_batch: int,
