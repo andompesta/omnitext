@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_workers", default=1, type=int)
     parser.add_argument("--optim_method", default="adamw")
     parser.add_argument("--weight_decay", default=0.01, type=float)
-    parser.add_argument("--lr", default=5e-5, type=float)
+    parser.add_argument("--lr", default=3e-4, type=float)
     parser.add_argument("--max_grad_norm", default=1., type=float)
     parser.add_argument("--eval_every", default=3, type=int)
     parser.add_argument("--epochs", default=40, type=int)
