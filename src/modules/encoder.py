@@ -42,7 +42,7 @@ class Encoder(nn.Module):
             elementwise_affine=True
         )
 
-        self.dropout = nn.Dropout(conf.hidden_dropout_prob)
+        self.embed_dropout = nn.Dropout(conf.hidden_dropout_prob)
 
         self.layer = nn.ModuleList([EncoderLayer(conf) for _ in range(self.num_hidden_layers)])
 
@@ -62,7 +62,7 @@ class Encoder(nn.Module):
 
         hidden_state += self.embed_positions(input_ids, positions=position_ids)
         hidden_state = self.embed_layer_norm(hidden_state)
-        hidden_state = self.dropout(hidden_state)
+        hidden_state = self.embed_dropout(hidden_state)
 
         for i, layer_module in enumerate(self.layer):
             hidden_state = layer_module(

@@ -2,8 +2,11 @@ import torch
 from typing import List, Tuple, Optional
 from .adam import Adam
 
-def get_group_params(named_parameters: List[Tuple[str, torch.nn.Parameter]],
-                     weight_decay: float, no_decay: Optional[List[str]] = None):
+def get_group_params(
+        named_parameters: List[Tuple[str, torch.nn.Parameter]],
+        weight_decay: float,
+        no_decay: Optional[List[str]] = None
+):
     """
     package the parameters in 2 groups for proper weight decay
     :param named_parameters: named parameters list

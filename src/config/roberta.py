@@ -24,9 +24,9 @@ class RobertaConfig(BaseConf):
             initializer_range=.02,
             layer_norm_eps=0.00001,
             url="https://dl.fbaipublicfiles.com/fairseq/models/xlmr.base.tar.gz",
-            pad_idx=1,
-            bos_idx=0,
-            eos_idx=2,
+            pad_token_id=1,
+            bos_token_id=0,
+            eos_token_id=2,
             embedding_scale=None,
             pos_embeddings_type="learned",
             attention_type="full",
@@ -48,9 +48,9 @@ class RobertaConfig(BaseConf):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.url = url
-        self.pad_idx = pad_idx
-        self.bos_idx = bos_idx
-        self.eos_idx = eos_idx
+        self.pad_token_id = pad_token_id
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
         self.embedding_scale = embedding_scale
         self.pos_embeddings_type = pos_embeddings_type
         self.attention_type = attention_type
@@ -68,8 +68,8 @@ if __name__ == '__main__':
 
     tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
 
-    assert conf.bos_idx == tokenizer.bos_token_id
-    assert conf.pad_idx == tokenizer.pad_token_id
-    assert conf.eos_idx == tokenizer.eos_token_id
+    assert conf.bos_token_id == tokenizer.bos_token_id
+    assert conf.pad_token_id == tokenizer.pad_token_id
+    assert conf.eos_token_id == tokenizer.eos_token_id
 
     print(tokenizer(["hello word", "how are you"], return_attention_mask=False))

@@ -99,7 +99,7 @@ class ClassifyDataset(OmniDataset):
 
 
 def get_classify_dataset(path_, group_names, max_tokens_per_batch: int,
-                         pad: int,
+                         pad_token_id: int,
                          shuffle: bool = True,
                          seed: int = 0,
                          max_sentence_length: int = 256,
@@ -112,7 +112,7 @@ def get_classify_dataset(path_, group_names, max_tokens_per_batch: int,
                          ):
 
     dataset = load_obj_from_file(path_)[group_names]
-    dataset = ClassifyDataset(dataset, pad, shuffle)
+    dataset = ClassifyDataset(dataset, pad_token_id, shuffle)
 
     with data_utils.numpy_seed(seed):
         indices = dataset.ordered_indices()

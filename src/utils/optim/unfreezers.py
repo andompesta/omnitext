@@ -2,6 +2,28 @@ from typing import List, Tuple
 import torch
 import re
 
+def unfreeze_layer_params(
+        named_parameters: List[Tuple[str, torch.nn.Parameter]],
+        layer: int = -1
+):
+    for n, p in named_parameters:
+        if "embed" in n:
+            p.detach_()
+            p.requires_grad = False
+            print(f'FREEZE -> {n}')
+        elif n.startswith("layer."):
+            layer_number = int(n.split(".")[1])
+            if p.requires_grad and layer_number > layer:
+                p.requires_grad = True
+                print(f"unfreeze -> {n}")
+            else:
+                p.requires_grad = False
+                print(f'FREEZE -> {n}')
+        elif p.requires_grad:
+            p.requires_grad = True
+            print(f"unfreeze -> {n}")
+
+
 def unfreeze_classifier_params(named_parameters: List[Tuple[str, torch.nn.Parameter]]):
     for name, param in named_parameters:
         if "xlm_roberta.encoder" in name:
