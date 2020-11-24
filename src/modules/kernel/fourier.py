@@ -181,7 +181,7 @@ class SoftmaxKernel(Kernel):
             ortho_scaling: Optional[float] = 0,
             causal: bool = False,
             orthogonal: bool = True,
-            eps: float = 1e-4
+            eps: float = 1e-6
     ):
         super(SoftmaxKernel, self).__init__(head_size)
         kernel_size = int(self.head_size * log(self.head_size)) if kernel_size is None else kernel_size
