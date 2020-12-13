@@ -1,5 +1,4 @@
 import re
-from nltk.corpus import stopwords
 import numpy as np
 import pandas as pd
 import csv
@@ -90,7 +89,7 @@ if __name__ == '__main__':
 
     np.linalg.norm(q-m, axis=1).argmin()
 
-    df = read_csv(os.path.join(settings.get("data_dir"), "hate-speech", "mlma", args.in_file))
+    df = read_csv(os.path.join(settings.get("data_dir"), "hatespeech", "mlma", args.in_file))
     assert df.shape[1] == 7
 
     collector = []
@@ -98,5 +97,5 @@ if __name__ == '__main__':
         collector.append((clean_text(text), sentiment, directness))
 
     df = pd.DataFrame.from_records(collector, columns=['tweet', 'sentiment', 'directness'])
-    df.to_csv(os.path.join(settings.get("data_dir"), "hate-speech", "mlma", args.out_file),
+    df.to_csv(os.path.join(settings.get("data_dir"), "hatespeech", "mlma", args.out_file),
               sep="\t")

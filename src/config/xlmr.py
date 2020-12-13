@@ -1,6 +1,6 @@
 """ XLM-RoBERTa configuration """
 
-from .roberta import RobertaConfig
+from src.config.roberta import RobertaConfig
 
 class XLMRobertaConfig(RobertaConfig):
     """
@@ -20,3 +20,16 @@ class XLMRobertaConfig(RobertaConfig):
             url="http://dl.fbaipublicfiles.com/fairseq/models/roberta.base.tar.gz",
             **kwargs
         )
+
+
+if __name__ == '__main__':
+    from transformers import XLMRobertaTokenizer
+    conf = XLMRobertaConfig()
+
+    tokenizer = XLMRobertaTokenizer.from_pretrained("xlm-roberta-import")
+
+    assert conf.bos_token_id == tokenizer.bos_token_id
+    assert conf.pad_token_id == tokenizer.pad_token_id
+    assert conf.eos_token_id == tokenizer.eos_token_id
+
+    print(tokenizer(["hello word", "how are you"], return_attention_mask=False))

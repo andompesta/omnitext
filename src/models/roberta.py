@@ -293,7 +293,7 @@ if __name__ == '__main__':
     conf = RobertaConfig(num_labels=2)
     roberta = RobertaClassificationModel(conf)
 
-    hugging_face = RobertaModel.from_pretrained('roberta-base', return_dict=True)
+    hugging_face = RobertaModel.from_pretrained('roberta-import', return_dict=True)
 
 
     state_dict = hugging_face.state_dict()
@@ -332,5 +332,5 @@ if __name__ == '__main__':
         renamed_dict[name] = value
 
     roberta.load_state_dict(renamed_dict, strict=False)
-    roberta.save(os.path.join(settings.get("exp_dir"), "pre-trained"), file_name="roberta-base.pth.tar", is_best=False)
+    roberta.save(os.path.join(settings.get("exp_dir"), "pre-trained"), file_name="roberta-import.pth.tar", is_best=False)
     roberta.load_state_dict(renamed_dict, strict=True)

@@ -66,7 +66,7 @@ if __name__ == '__main__':
     from transformers import RobertaTokenizerFast
     conf = RobertaConfig()
 
-    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-import")
 
     assert conf.bos_token_id == tokenizer.bos_token_id
     assert conf.pad_token_id == tokenizer.pad_token_id

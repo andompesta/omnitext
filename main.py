@@ -67,7 +67,7 @@ if __name__ == '__main__':
         os.path.join(
             settings.get("exp_dir"),
             "pre-trained",
-            "roberta-base.pth.tar"
+            "roberta-import.pth.tar"
         ),
         mode="pre-trained"
     )

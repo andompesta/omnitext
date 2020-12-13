@@ -162,7 +162,7 @@ if __name__ == '__main__':
     )
 
     print(len(dataset_gen))
-    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-import")
 
     for epoch in range(1):
         print(f"epoch iterator - {epoch} - {dataset_gen.epoch}")

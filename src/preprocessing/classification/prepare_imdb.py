@@ -56,7 +56,7 @@ if __name__ == '__main__':
     print(labels_to_idx)
     print(idx_to_labels)
 
-    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-import")
 
     collector = {}
 
