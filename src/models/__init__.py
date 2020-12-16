@@ -4,6 +4,6 @@ from src.models.roberta import (
 )
 
 __all__ = [
-    "XLMClassificationModel",
-    "XLMMaskedLanguageModel"
+    "RobertaClassificationModel",
+    "RobertaMaskedLanguageModel"
 ]

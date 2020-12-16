@@ -56,7 +56,12 @@ class BaseModel(torch.nn.Module):
         if hasattr(out_embeddings, "out_features") and hasattr(in_embeddings, "num_embeddings"):
             out_embeddings.out_features = in_embeddings.num_embeddings
 
-    def save(self, path_: str, is_best: Optional[bool] = False, file_name:str = 'checkpoint.pth.tar') -> None:
+    def save(
+            self,
+            path_: str,
+            file_name: str = 'checkpoint.pth.tar',
+            is_best: Optional[bool] = False,
+    ):
         if isinstance(self, torch.nn.DataParallel):
             state_dict = dict([(key, value.to("cpu")) for key, value in self.module.state_dict().items()])
         else:

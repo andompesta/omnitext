@@ -11,12 +11,14 @@ class XLMRobertaConfig(RobertaConfig):
     def __init__(
             self,
             name="xlm-roberta-pre-trained",
-            vocab_size=50265,
+            vocab_size=250002,
+            max_position_embeddings=514,
             **kwargs
     ):
         super(XLMRobertaConfig, self).__init__(
             name=name,
             vocab_size=vocab_size,
+            max_position_embeddings=max_position_embeddings,
             url="http://dl.fbaipublicfiles.com/fairseq/models/roberta.base.tar.gz",
             **kwargs
         )

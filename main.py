@@ -5,8 +5,8 @@ import os
 from dynaconf import settings
 from datetime import datetime
 
-from src.config import RobertaConfig
-from src.models import RobertaClassificationModel
+from src.config import XLMRobertaConfig
+from src.models import XLMClassificationModel
 from src.preprocessing.classification import IMDB_LABEL_TO_IDX
 from src.utils.dataset import get_classify_dataset
 from src.utils.optim import get_optimizer, get_group_params, get_linear_scheduler_with_warmup, unfreeze_layer_params
@@ -15,23 +15,23 @@ from src.tasks import ClassificationTask
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task_name", default="0")
-    parser.add_argument("--model_version", default="0")
-    parser.add_argument("--db_name", default="imdb")
-    parser.add_argument("--db_version", default="0")
+    parser.add_argument("--task_name", default="hatespeech")
+    parser.add_argument("--model_version", default="")
+    parser.add_argument("--db_name", default="hatespeech")
+    parser.add_argument("--db_version", default="")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--n_gpus", default=1)
 
 
     parser.add_argument("--gradient_accumulation_steps", default=2, type=int)
-    parser.add_argument("--batches_per_epoch", default=0, type=int)
+    parser.add_argument("--batches_per_epoch", default=50000, type=int)
     parser.add_argument("--max_sentences_per_batch", default=50, type=int)
     parser.add_argument("--max_tokens_per_batch", default=7000, type=int)
     parser.add_argument("--max_sentence_length", default=1400, type=int)
     parser.add_argument("--num_workers", default=1, type=int)
     parser.add_argument("--optim_method", default="adamw")
     parser.add_argument("--weight_decay", default=0.01, type=float)
-    parser.add_argument("--lr", default=3e-4, type=float)
+    parser.add_argument("--lr", default=5e-5, type=float)
     parser.add_argument("--max_grad_norm", default=1., type=float)
     parser.add_argument("--eval_every", default=3, type=int)
     parser.add_argument("--epochs", default=40, type=int)
@@ -53,16 +53,13 @@ if __name__ == '__main__':
     args = parse_args()
     device = torch.device(args.device)
 
-    conf = RobertaConfig(
-        pos_embeddings_type="partually_fixed",
-        max_position_embeddings=3002,
-        fixed_num_embeddings=514,
-        trainable_num_embeddings=3002-514,
-        attention_type="linear",
-        num_labels=len(IMDB_LABEL_TO_IDX)
+    conf = XLMRobertaConfig(
+        num_labels=len(IMDB_LABEL_TO_IDX),
+        adapter_size=384,
+        max_position_embeddings=514
     )
 
-    model = RobertaClassificationModel.load(
+    model = XLMClassificationModel.load(
         conf,
         os.path.join(
             settings.get("exp_dir"),
@@ -79,14 +76,12 @@ if __name__ == '__main__':
     )
 
     model_name = model.name + args.model_version
-    unfreeze_layer_params(model.named_parameters(), layer=3)
-    # adjust positional embedding
-    model.embed_positions.weight.requires_grad = True
+    unfreeze_layer_params(model.named_parameters(), layer=7)
 
-    if torch.cuda.device_count() > 1 and args.n_gpus > 1:
-        model = torch.nn.DataParallel(model, device_ids=[1, 0])
-        args.max_sentences_per_batch *= args.max_sentences_per_batch
-        args.max_tokens_per_batch *= (args.n_gpus // 2)
+    # if torch.cuda.device_count() > 1 and args.n_gpus > 1:
+    #     model = torch.nn.DataParallel(model, device_ids=[1, 0])
+    #     args.max_sentences_per_batch *= args.max_sentences_per_batch
+    #     args.max_tokens_per_batch *= (args.n_gpus // 2)
 
     model = model.to(device)
 
@@ -95,7 +90,8 @@ if __name__ == '__main__':
         "train",
         max_tokens_per_batch=4000,
         pad_token_id=conf.pad_token_id,
-        max_sentence_length=512
+        max_sentence_length=512,
+        max_iter_length=args.batches_per_epoch
     )
 
     eval_epoch_gen = get_classify_dataset(
@@ -105,7 +101,7 @@ if __name__ == '__main__':
         pad_token_id=conf.pad_token_id,
         max_sentence_length=512
     )
-    if args.batches_per_epoch <= 0:
+    if args.batches_per_epoch == 0:
         args.batches_per_epoch = len(train_epoch_gen)
     args = compute_warmup_steps(args)
 

@@ -6,16 +6,49 @@ from collections import OrderedDict
 from src.config import RobertaConfig
 
 from src.modules import (
-    Encoder,
     BaseModel,
+    TokenEmbedding,
+    PositionalEmbedding,
+    Encoder,
     ClassificationHead,
-    LMHead
+    LMHead,
+    Pooler
 )
 
 
-class RobertaEncoder(Encoder):
+class RobertaModel(BaseModel):
     def __init__(self, conf: RobertaConfig):
-        super(RobertaEncoder, self).__init__(conf)
+        super(RobertaModel, self).__init__(conf)
+        self.embedding_scale = conf.embedding_scale
+
+        self.embed_tokens = TokenEmbedding(
+            num_embeddings=conf.vocab_size,
+            embedding_dim=conf.hidden_size,
+            padding_idx=conf.pad_token_id,
+            initializer_range=conf.initializer_range,
+            scale=conf.embedding_scale
+        )
+
+        self.embed_positions = PositionalEmbedding(
+            num_embeddings=conf.max_position_embeddings,
+            embedding_dim=conf.hidden_size,
+            padding_idx=conf.pad_token_id,
+            initializer_range=conf.initializer_range,
+            type=conf.pos_embeddings_type,
+            trainable_num_embeddings=conf.trainable_num_embeddings,
+            fixed_num_embeddings=conf.fixed_num_embeddings
+        )
+
+        self.embed_layer_norm = nn.LayerNorm(
+            conf.hidden_size,
+            eps=conf.layer_norm_eps,
+            elementwise_affine=True
+        )
+
+        self.embed_dropout = nn.Dropout(conf.hidden_dropout_prob)
+
+        self.encoder = Encoder(conf)
+        self.pooler = Pooler(conf)
 
     def forward(
             self,
@@ -23,7 +56,7 @@ class RobertaEncoder(Encoder):
             attention_mask: Optional[Tensor] = None,
             position_ids: Optional[Tensor] = None,
             **kwargs
-    ):
+    ) -> Tuple[Tensor, Tensor]:
         if attention_mask is None:
             if conf.attention_type == "full":
                 attention_mask = input_ids.eq(self.pad_idx)
@@ -36,13 +69,57 @@ class RobertaEncoder(Encoder):
             else:
                 raise NotImplementedError('Not implemented yet. Support only "full" and "linear".')
 
-        outputs = super(RobertaEncoder, self).forward(
-            input_ids=input_ids,
+        hidden_states = self.embeddings(
+            input_ids,
+            position_ids
+        )
+
+        hidden_states = self.encoder(
+            hidden_states=hidden_states,
             attention_mask=attention_mask,
-            position_ids=position_ids,
             **kwargs
         )
-        return outputs
+
+        pooled_state = self.pooler(hidden_states)
+
+        return pooled_state, hidden_states
+
+    def embeddings(
+            self,
+            input_ids: Tensor,
+            position_ids: Optional[Tensor] = None
+    ) -> Tensor:
+        hidden_states = self.embed_tokens(input_ids)
+        if self.embedding_scale is not None:
+            hidden_states *= self.embedding_scale
+
+        hidden_states += self.embed_positions(
+            input_ids,
+            position_ids
+        )
+
+        hidden_states = self.embed_layer_norm(hidden_states)
+        hidden_states = self.embed_dropout(hidden_states)
+
+        return hidden_states
+
+    def _init_weights(self, module: nn.Module):
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if module.bias is not None:
+                module.bias.data.zero_()
+            print("linear init for {}".format(module))
+
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant_(module.bias, 0.)
+            nn.init.constant_(module.weight, 1.)
+            print("layer norm init for {}".format(module))
+
+        elif hasattr(module, "_init_weights") and not isinstance(module, BaseModel):
+            module._init_weights()
+
+        else:
+            print("----> WARNING: module {} not initialized".format(module))
 
     def get_linear_attention_mask(
             self,
@@ -98,8 +175,13 @@ class RobertaEncoder(Encoder):
         extended_attention_mask = extended_attention_mask * -10000.0
         return extended_attention_mask
 
+    def get_input_embeddings(self):
+        return self.embed_tokens
 
-class RobertaMaskedLanguageModel(RobertaEncoder, BaseModel):
+    def get_output_embeddings(self) -> torch.nn.Module:
+        raise ValueError("classification model has no output embedding")
+
+class RobertaMaskedLanguageModel(RobertaModel):
     def __init__(self, conf: RobertaConfig):
         conf.name += "-mlm"
         super(RobertaMaskedLanguageModel, self).__init__(conf)
@@ -115,43 +197,16 @@ class RobertaMaskedLanguageModel(RobertaEncoder, BaseModel):
             **kwargs
     ) -> Tuple[Tensor, Tensor]:
 
-        enc_outputs = self.sentence_encoder(
+        pooled_state, hidden_states = super(RobertaMaskedLanguageModel, self).forward(
             input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
+            attention_mask,
+            position_ids,
             **kwargs
         )
-        logits = self.lm_head(enc_outputs)
 
-        outputs = (logits, enc_outputs)
-        return outputs
+        logits = self.lm_head(hidden_states)
 
-    def _init_weights(self, module: torch.nn.Module):
-        if hasattr(module, "_init_weights") and not isinstance(module, RobertaMaskedLanguageModel):
-            module._init_weights()
-            print("_init_weights for {}".format(module))
-
-        elif isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=0.02)
-            if module.bias is not None:
-                module.bias.data.zero_()
-            print("linear init for {}".format(module))
-
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=0.02)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-
-            print("embedding init for {}".format(module))
-
-        elif isinstance(module, nn.LayerNorm):
-            nn.init.constant(module.bias, 0.)
-            nn.init.constant(module.weight, 1.)
-            print("layer norm init for {}".format(module))
-
-        else:
-            print("----> WARNING: module {} not initialized".format(module))
-
+        return logits
 
     def get_input_embeddings(self):
         return self.sentence_encoder.embed_tokens
@@ -160,7 +215,7 @@ class RobertaMaskedLanguageModel(RobertaEncoder, BaseModel):
         return self.lm_head.decoder
 
 
-class RobertaClassificationModel(RobertaEncoder, BaseModel):
+class RobertaClassificationModel(RobertaModel):
     def __init__(self, conf: RobertaConfig):
         conf.name += "-classify"
         super(RobertaClassificationModel, self).__init__(conf)
@@ -176,112 +231,16 @@ class RobertaClassificationModel(RobertaEncoder, BaseModel):
             **kwargs
     ) -> Tuple[Tensor, Tensor]:
 
-        enc_outputs = self.sentence_encoder(
+        pooled_state, hidden_states = super(RobertaClassificationModel, self).forward(
             input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
+            attention_mask,
+            position_ids,
             **kwargs
         )
-        logits = self.classification_head(enc_outputs)
 
-        outputs = (logits, enc_outputs)
-        return outputs
+        logits = self.classification_head(pooled_state)
 
-    def _init_weights(self, module: torch.nn.Module):
-        if hasattr(module, "_init_weights") and not isinstance(module, RobertaClassificationModel):
-            module._init_weights()
-            print("_init_weights for {}".format(module))
-
-        elif isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=0.02)
-            if module.bias is not None:
-                module.bias.data.zero_()
-            print("linear init for {}".format(module))
-
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=0.02)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-
-            print("embedding init for {}".format(module))
-
-        elif isinstance(module, nn.LayerNorm):
-            nn.init.constant_(module.bias, 0.)
-            nn.init.constant_(module.weight, 1.)
-            print("layer norm init for {}".format(module))
-
-        else:
-            print("----> WARNING: module {} not initialized".format(module))
-
-    def get_input_embeddings(self):
-        return self.sentence_encoder.embed_tokens
-
-    def get_output_embeddings(self) -> torch.nn.Module:
-        raise ValueError("classification model has no output embedding")
-
-# class XLMClassificationModel(BaseModel):
-#     def __init__(self, conf: XLMRobertaConfig):
-#         conf.name += "-classify"
-#         super(XLMClassificationModel, self).__init__(conf)
-#         self.sentence_encoder = RobertaEncoder(conf)
-#         self.classification_head = RobertaClassificationHead(conf)
-#
-#         self.init_weights()
-#
-#     def forward(
-#             self,
-#             input_ids: Tensor,
-#             position_ids: Optional[Tensor],
-#             attention_mask: Optional[Tensor] = None,
-#             output_attentions: bool = False,
-#             output_hidden_states: bool = False,
-#     ) -> Tuple[Tensor, Tensor, Optional[Tuple[Tensor]], Optional[Tuple[Tensor]]]:
-#
-#         enc_outputs = self.sentence_encoder(
-#             input_ids,
-#             position_ids=position_ids,
-#             attention_mask=attention_mask,
-#             output_attentions=output_attentions,
-#             output_hidden_states=output_hidden_states
-#         )
-#         hidden_state = enc_outputs[0]
-#         logits = self.classification_head(hidden_state)
-#
-#         outputs = (logits, hidden_state, enc_outputs[1], enc_outputs[2])
-#         return outputs
-#
-#     def _init_weights(self, module: torch.nn.Module):
-#         if hasattr(module, "_init_weights") and not isinstance(module, XLMClassificationModel):
-#             module._init_weights()
-#             print("_init_weights for {}".format(module))
-#
-#         elif isinstance(module, nn.Linear):
-#             module.weight.data.normal_(mean=0.0, std=0.02)
-#             if module.bias is not None:
-#                 module.bias.data.zero_()
-#             print("linear init for {}".format(module))
-#
-#         elif isinstance(module, nn.Embedding):
-#             module.weight.data.normal_(mean=0.0, std=0.02)
-#             if module.padding_idx is not None:
-#                 module.weight.data[module.padding_idx].zero_()
-#
-#             print("embedding init for {}".format(module))
-#
-#         elif isinstance(module, nn.LayerNorm):
-#             nn.init.constant_(module.bias, 0.)
-#             nn.init.constant_(module.weight, 1.)
-#             print("layer norm init for {}".format(module))
-#
-#         else:
-#             print("----> WARNING: module {} not initialized".format(module))
-#
-#     def get_input_embeddings(self):
-#         return self.sentence_encoder.embed_tokens
-#
-#     def get_output_embeddings(self) -> torch.nn.Module:
-#         raise ValueError("classification model has no output embedding")
-
+        return logits
 
 
 if __name__ == '__main__':

@@ -200,3 +200,56 @@ class Output(nn.Module):
         hidden_state = residual + hidden_state
         hidden_state = self.layer_norm(hidden_state)
         return hidden_state
+
+
+class Pooler(nn.Module):
+    def __init__(self, conf):
+        super().__init__()
+        self.dense = nn.Linear(conf.hidden_size, conf.hidden_size)
+
+    def forward(
+            self,
+            hidden_states: Tensor,
+            attention_mask: Optional[Tensor] = None
+    ) -> Tensor:
+        if attention_mask is None:
+            x = hidden_states[:, 0, :]  # take <s> token (equiv. to [CLS])
+        else:
+            # compute average of all tokens
+            attention_mask = 1 - attention_mask
+            hidden_states *= attention_mask[:, :, None]
+            x = hidden_states.sum(dim=1)
+            x /= attention_mask.sum(dim=1)[:, None]
+
+
+        x = self.dense(x)
+        x = torch.tanh(x)
+
+        return x
+
+
+class Adapter(nn.Module):
+    def __init__(
+            self,
+            conf
+    ):
+        super().__init__()
+        self.down_prj = nn.Linear(
+            conf.hidden_size,
+            conf.adapter_size,
+            bias=False
+        )
+        self.up_prj = nn.Linear(
+            conf.adapter_size,
+            conf.hidden_size,
+            bias=False
+        )
+
+    def forward(
+            self,
+            pooled_output: Tensor
+    ) -> Tensor:
+        x = self.down_prj(pooled_output)
+        x = torch.relu(x)
+        x = self.up_prj(x)
+        return x + pooled_output

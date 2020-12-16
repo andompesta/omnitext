@@ -36,7 +36,6 @@ class LMHead(nn.Module):
         x = self.decoder(x)
         return x
 
-
 class ClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
@@ -45,18 +44,13 @@ class ClassificationHead(nn.Module):
         self.hidden_size = conf.hidden_size
         self.num_labels = conf.num_labels
 
-        self.dense = nn.Linear(self.hidden_size, self.hidden_size)
         self.dropout = nn.Dropout(p=conf.hidden_dropout_prob)
         self.out_proj = nn.Linear(self.hidden_size, self.num_labels)
 
     def forward(
             self,
-            features: torch.Tensor
+            hidden_state: torch.Tensor
     ) -> torch.Tensor:
-        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
-        x = self.dropout(x)
-        x = self.dense(x)
-        x = torch.tanh(x)
-        x = self.dropout(x)
-        x = self.out_proj(x)
-        return x
+        hidden_state = self.dropout(hidden_state)
+        hidden_state = self.out_proj(hidden_state)
+        return hidden_state

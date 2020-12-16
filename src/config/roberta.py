@@ -29,6 +29,8 @@ class RobertaConfig(BaseConf):
             eos_token_id=2,
             embedding_scale=None,
             pos_embeddings_type="learned",
+            trainable_num_embeddings=2488,
+            fixed_num_embeddings=514,
             attention_type="full",
             kernel_type="favor",
             kernel_size=256,
@@ -53,6 +55,8 @@ class RobertaConfig(BaseConf):
         self.eos_token_id = eos_token_id
         self.embedding_scale = embedding_scale
         self.pos_embeddings_type = pos_embeddings_type
+        self.trainable_num_embeddings = trainable_num_embeddings
+        self.fixed_num_embeddings = fixed_num_embeddings
         self.attention_type = attention_type
         self.kernel_type = kernel_type
         self.kernel_size = kernel_size

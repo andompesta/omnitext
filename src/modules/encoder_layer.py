@@ -26,22 +26,21 @@ class EncoderLayer(nn.Module):
 
     def forward(
             self,
-            hidden_state: Tensor,
+            hidden_states: Tensor,
             attention_mask: Optional[Tensor] = None,
             **kwargs
     ) -> Tensor:
-        residual = hidden_state
-        hidden_state = self.attn(
-            hidden_state,
+        residual = hidden_states
+        hidden_states = self.attn(
+            hidden_states,
             attention_mask=attention_mask,
             **kwargs
         )
 
-        hidden_state = self.self_output(hidden_state, residual)
+        hidden_states = self.self_output(hidden_states, residual)
 
-        residual = hidden_state
-        hidden_state = self.intermediate(hidden_state)
-        hidden_state = self.output(hidden_state, residual)
-        outputs = hidden_state
-        return outputs
+        residual = hidden_states
+        hidden_states = self.intermediate(hidden_states)
+        hidden_states = self.output(hidden_states, residual)
+        return hidden_states
 

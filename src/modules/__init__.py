@@ -1,9 +1,18 @@
-from .components import SelfOutput, LinearAttention, SelfAttention, Intermediate, Output
+from .components import (
+    SelfOutput,
+    LinearAttention,
+    SelfAttention,
+    Intermediate,
+    Output,
+    Adapter,
+    Pooler
+)
 from .embedding import PositionalEmbedding, TokenEmbedding
 from .encoder_layer import EncoderLayer
 from .encoder import Encoder
 from .utils import BaseModel
 from .heads import ClassificationHead, LMHead
+
 __all__ = [
     "SelfAttention",
     "LinearAttention",
@@ -16,5 +25,7 @@ __all__ = [
     "Encoder",
     "BaseModel",
     "ClassificationHead",
-    "LMHead"
+    "LMHead",
+    "Adapter",
+    "Pooler"
 ]
