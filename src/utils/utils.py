@@ -13,7 +13,7 @@ def ensure_dir(path_: str) -> str:
 
 def save_obj_to_file(path_:str, obj:object):
     with open(ensure_dir(path_), "wb") as writer:
-        pickle.dump(obj, writer, protocol=2)
+        pickle.dump(obj, writer)
 
 def load_obj_from_file(path_: str) -> object:
     with open(path_, "rb") as reader:

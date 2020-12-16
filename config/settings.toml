@@ -1,5 +1,5 @@
 [default]
 ckp_dir = '/home/ando/Projects/omnitext/checkpoint'
 run_dir = '~/Projects/omnitext/run'
-data_dir = '~/Projects/omnitext/data'
+data_dir = '/home/ando/Projects/omnitext/data'
 exp_dir = '~/Projects/omnitext/export'
