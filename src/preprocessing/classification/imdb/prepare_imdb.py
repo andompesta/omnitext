@@ -40,7 +40,7 @@ def encode(
 
 
 if __name__ == '__main__':
-    dataset = load_dataset("imdb")
+    dataset = load_dataset("")
     train = dataset.get("train").shuffle()
     eval = dataset.get("test")
     eval = eval.train_test_split(.5)

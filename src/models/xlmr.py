@@ -1,3 +1,4 @@
+import torch
 from torch import nn, Tensor
 from typing import Optional, Tuple
 from src.modules import (Pooler, ClassificationHead, Adapter, BaseModel)
@@ -56,6 +57,35 @@ class XLMRobertaClassificationModel(RobertaModel):
 
         else:
             print("----> WARNING: module {} not initialized".format(module))
+
+    @classmethod
+    def load(
+            cls,
+            conf: XLMRobertaConfig,
+            path_: str,
+            mode: str = 'trained'
+    ):
+        model = cls(conf)
+        state_dict = torch.load(path_, map_location="cpu")
+
+        if mode == 'pre-trained':
+            state_dict.pop("classification_head.out_proj.weight")
+            state_dict.pop("classification_head.out_proj.bias")
+            if 'adapter.down_prj.weight' in state_dict:
+                state_dict.pop('adapter.down_prj.weight')
+            if 'adapter.up_prj.weight' in state_dict:
+                state_dict.pop('adapter.up_prj.weight')
+            strict = False
+
+        elif mode == 'trained':
+            state_dict = state_dict['state_dict']
+            strict = True
+
+        else:
+            raise NotImplementedError()
+
+        print(model.load_state_dict(state_dict, strict=strict))
+        return model
 
     def get_input_embeddings(self):
         return self.sentence_encoder.embed_tokens

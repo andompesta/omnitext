@@ -1,7 +1,7 @@
 import torch
 import math
 
-class Adam(torch.optim.optimizer.Optimizer):
+class Adam(torch.optim.Optimizer):
     """Implements Adam algorithm.
     This implementation is modified from torch.optim.Adam based on:
     `Fixed Weight Decay Regularization in Adam`

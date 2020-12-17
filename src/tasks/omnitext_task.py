@@ -13,16 +13,16 @@ class OmniTask(ABC):
         self.global_step = global_step
         self.writer = SummaryWriter(path.join(settings.get("run_dir"), self.name))
 
-    @abstractmethod
-    def get_loss_fn(self, **kwargs) -> nn.modules.loss._Loss:
+    @classmethod
+    def get_loss_fn(cls, **kwargs) -> nn.modules.loss._Loss:
         """
         return the loss used during training
         :return: loss function
         """
         ...
 
-    @abstractmethod
-    def compute_correct(self, logits: Tensor, labels: Tensor, **kwargs) -> Tuple[Tensor, int]:
+    @classmethod
+    def compute_correct(cls, logits: Tensor, labels: Tensor, **kwargs) -> Tuple[Tensor, int]:
         """
         compute the number of correct predictions
         :param logit:
@@ -32,20 +32,10 @@ class OmniTask(ABC):
         ...
 
     @abstractmethod
-    def unfreeze_layer(self, model: nn.Module, **kwargs):
-        """
-        unfreeze layer function
-        :param model:
-        :param kwargs:
-        :return:
-        """
-        ...
-
-    @abstractmethod
     def train(
             self,
             model: nn.Module,
-            optimizer: optim.optimizer.Optimizer,
+            optimizer: optim.Optimizer,
             scheduler: optim.lr_scheduler.LambdaLR,
             dataloader: OmniDataset,
             device,

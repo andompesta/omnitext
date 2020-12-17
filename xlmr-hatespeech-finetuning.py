@@ -6,18 +6,18 @@ from dynaconf import settings
 from datetime import datetime
 
 from src.config import XLMRobertaConfig
-from src.models import XLMClassificationModel
-from src.preprocessing.classification import IMDB_LABEL_TO_IDX
+from src.models import XLMRobertaClassificationModel
+from src.preprocessing.multilabel.hatespeech.multilingual import JIGSAW_MULTILINGUAL_LABELS_TO_IDX
 from src.utils.dataset import get_classify_dataset
 from src.utils.optim import get_optimizer, get_group_params, get_linear_scheduler_with_warmup, unfreeze_layer_params
 from src.utils import save_data_to_json, save_checkpoint
-from src.tasks import ClassificationTask
+from src.tasks import MultilabelClassificationTask
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task_name", default="hatespeech")
+    parser.add_argument("--task_name", default="multilabel")
     parser.add_argument("--model_version", default="")
-    parser.add_argument("--db_name", default="hatespeech")
+    parser.add_argument("--db_name", default="jigsaw_multilingual")
     parser.add_argument("--db_version", default="")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--n_gpus", default=1)
@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_tokens_per_batch", default=7000, type=int)
     parser.add_argument("--max_sentence_length", default=1400, type=int)
     parser.add_argument("--num_workers", default=1, type=int)
-    parser.add_argument("--optim_method", default="adamw")
+    parser.add_argument("--optim_method", default="adam")
     parser.add_argument("--weight_decay", default=0.01, type=float)
     parser.add_argument("--lr", default=5e-5, type=float)
     parser.add_argument("--max_grad_norm", default=1., type=float)
@@ -54,17 +54,17 @@ if __name__ == '__main__':
     device = torch.device(args.device)
 
     conf = XLMRobertaConfig(
-        num_labels=len(IMDB_LABEL_TO_IDX),
+        num_labels=len(JIGSAW_MULTILINGUAL_LABELS_TO_IDX),
         adapter_size=384,
         max_position_embeddings=514
     )
 
-    model = XLMClassificationModel.load(
+    model = XLMRobertaClassificationModel.load(
         conf,
         os.path.join(
-            settings.get("exp_dir"),
-            "pre-trained",
-            "roberta-import.pth.tar"
+            settings.get("ckp_dir"),
+            "import",
+            "xlm-roberta-pre-trained.pth.tar"
         ),
         mode="pre-trained"
     )
@@ -76,6 +76,9 @@ if __name__ == '__main__':
     )
 
     model_name = model.name + args.model_version
+    db_name = args.db_name
+    if args.db_version != "":
+        db_name += f"_{args.db_version}"
     unfreeze_layer_params(model.named_parameters(), layer=7)
 
     # if torch.cuda.device_count() > 1 and args.n_gpus > 1:
@@ -86,7 +89,11 @@ if __name__ == '__main__':
     model = model.to(device)
 
     train_epoch_gen = get_classify_dataset(
-        os.path.join(settings.get("data_dir"), "classification", f"{args.dataset}.pt"),
+        os.path.join(
+            settings.get("data_dir"),
+            "multilabel",
+            f"{db_name}.pt"
+        ),
         "train",
         max_tokens_per_batch=4000,
         pad_token_id=conf.pad_token_id,
@@ -95,7 +102,11 @@ if __name__ == '__main__':
     )
 
     eval_epoch_gen = get_classify_dataset(
-        os.path.join(settings.get("data_dir"), "classification", f"{args.dataset}.pt"),
+        os.path.join(
+            settings.get("data_dir"),
+            "multilabel",
+            f"{db_name}.pt"
+        ),
         "eval",
         max_tokens_per_batch=4000,
         pad_token_id=conf.pad_token_id,
@@ -116,21 +127,22 @@ if __name__ == '__main__':
         args.num_training_steps
     )
 
-    exp_name = f'exp-{args.task_name}-{args.db_name}-{args.db_version}-{model_name}-{datetime.now().strftime("%d-%m-%y_%H-%M-%S")}'
+    exp_name = f'exp-{args.task_name}-{db_name}-{model_name}-{datetime.now().strftime("%d-%m-%y_%H-%M-%S")}'
     print(f"RUNNING EXPERIMENT -> {exp_name}")
 
     conf.save(os.path.join(
         settings.get("ckp_dir"),
         args.task_name,
-        f"{args.db_name}_{args.db_version}",
-        model_name
+        db_name,
+        model_name,
+        "conf.json"
     ))
 
     save_data_to_json(
         os.path.join(
             settings.get("ckp_dir"),
             args.task_name,
-            f"{args.db_name}_{args.db_version}",
+            db_name,
             model_name,
             "args.json"
         ),
@@ -147,7 +159,7 @@ if __name__ == '__main__':
     eval_f1 = []
     eval_acc = []
 
-    task = ClassificationTask(
+    task = MultilabelClassificationTask(
         name=exp_name,
         args=args,
         pad_token_id=conf.pad_token_id,
@@ -208,7 +220,7 @@ if __name__ == '__main__':
                 path_=os.path.join(
                     settings.get("ckp_dir"),
                     args.task_name,
-                    f"{args.db_name}_{args.db_version}",
+                    db_name,
                     model_name
                 ),
                 state=state_dict,

@@ -79,7 +79,6 @@ class BaseModel(torch.nn.Module):
         if mode == 'pre-trained':
             strict = False
         elif mode == 'trained':
-            state_dict = state_dict['state_dict']
             strict = True
         else:
             raise NotImplementedError()

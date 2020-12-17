@@ -6,17 +6,6 @@ import argparse
 from dynaconf import settings
 from src.utils import save_obj_to_file
 
-
-LABELS = [
-    "toxicity",
-    "severe_toxicity",
-    "obscene",
-    "identity_attack",
-    "insult",
-    "threat",
-    "sexual_explicit"
-]
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--db_name", default="hatespeech")
@@ -104,7 +93,7 @@ if __name__ == '__main__':
     save_obj_to_file(
         os.path.join(
             settings.get("data_dir"),
-            "hatespeech",
+            "multilabel",
             "jigsaw_multilingual.pt"
         ),
         collector

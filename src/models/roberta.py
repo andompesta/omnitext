@@ -49,6 +49,7 @@ class RobertaModel(BaseModel):
 
         self.encoder = Encoder(conf)
         self.pooler = Pooler(conf)
+        self.dtype = next(self.parameters()).dtype
 
     def forward(
             self,
@@ -58,13 +59,13 @@ class RobertaModel(BaseModel):
             **kwargs
     ) -> Tuple[Tensor, Tensor]:
         if attention_mask is None:
-            if conf.attention_type == "full":
-                attention_mask = input_ids.eq(self.pad_idx)
+            if self.conf.attention_type == "full":
+                attention_mask = input_ids.eq(self.conf.pad_token_id)
                 # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
                 # ourselves in which case we just need to make it broadcastable to all heads.
                 attention_mask = self.get_extended_attention_mask(attention_mask)
             elif conf.attention_type == "linear":
-                attention_mask = input_ids.ne(self.pad_idx)
+                attention_mask = input_ids.ne(self.conf.pad_token_id)
                 attention_mask = self.get_linear_attention_mask(attention_mask)
             else:
                 raise NotImplementedError('Not implemented yet. Support only "full" and "linear".')

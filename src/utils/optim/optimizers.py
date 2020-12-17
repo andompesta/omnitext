@@ -25,7 +25,7 @@ def get_group_params(
     ]
     return optimizer_grouped_parameters
 
-def get_optimizer(**kwargs) -> torch.optim.optimizer.Optimizer:
+def get_optimizer(**kwargs) -> torch.optim.Optimizer:
     method = kwargs.get("method")
     params = kwargs.get("params")
 
@@ -49,6 +49,6 @@ def get_optimizer(**kwargs) -> torch.optim.optimizer.Optimizer:
             lr=kwargs.get("lr", 0.001),
         )
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"method {method} not implemented yet")
 
     return optim_cls(**optim_params)

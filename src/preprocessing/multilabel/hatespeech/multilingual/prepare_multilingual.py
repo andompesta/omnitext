@@ -176,8 +176,7 @@ def preprocess_unintended_comment(args):
         path.join(
             settings.get("ckp_dir"),
             "import",
-            "lang-dtc",
-            "lid.176.bin"
+            "lang-dtc.bin"
         )
     )
 

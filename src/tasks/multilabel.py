@@ -8,40 +8,49 @@ from src.utils.data import OmniDataset
 from argparse import Namespace
 
 
-class ClassificationTask(OmniTask):
+class MultilabelClassificationTask(OmniTask):
     def __init__(
             self,
             name: str,
             args: Namespace,
             pad_token_id: int,
-            eos_token_id: Optional[int]
+            eos_token_id: Optional[int],
+            ignore_index: int = -1
     ):
-        super(ClassificationTask, self).__init__(name, args)
+        super(MultilabelClassificationTask, self).__init__(name, args)
         self.pad_token_id = pad_token_id
         self.eos_token_id = eos_token_id
+        self.ignore_index = ignore_index
 
     @classmethod
     def get_loss_fn(
             cls,
-            reduction='none',
-            ignore_index=-1
+            type: str = "binary_cross_entropy",
+            reduction: str = 'none',
+            pos_weight: Optional[Tensor] = None
     ):
-        return nn.CrossEntropyLoss(
-            reduction=reduction,
-            ignore_index=ignore_index
-        )
+        if type == "binary_cross_entropy":
+            return nn.BCEWithLogitsLoss(
+                reduction=reduction,
+                pos_weight=pos_weight
+            )
+        else:
+            raise NotImplementedError(f"loss {type} not yet implemented")
+
 
     @classmethod
     def compute_correct(
             cls,
             logits: Tensor,
             labels: Tensor,
+            th: float = 0.5,
             **kwargs
     ) -> Tuple[Tensor, int]:
         with torch.no_grad():
-            pred_idx = logits.argmax(1)
-            n_correct = pred_idx.eq(labels).sum().item()
-            return pred_idx, n_correct
+            preds = torch.sigmoid(logits) > th
+            preds = preds.long()
+            n_correct = preds.eq(labels).sum().item()
+            return preds, n_correct
 
 
     def train(
@@ -54,8 +63,9 @@ class ClassificationTask(OmniTask):
             **kwargs
     ) -> Tuple[float, float]:
         model.train()
-        optimizer.zero_grad()
-        loss_fn = self.get_loss_fn()
+        loss_fn = self.get_loss_fn(
+            type=kwargs.get("loss_type", "binary_cross_entropy")
+        )
 
         total_loss = 0
         n_pred_total = 0
@@ -64,12 +74,19 @@ class ClassificationTask(OmniTask):
 
         for batch_idx, batch in enumerate(dataloader):
             batch = tuple(t.to(device) for t in batch)
-            src_seq_t, label_t = batch
+            src_seq_t, pos_seq_t, label_t = batch
+
+            # compute mask
+            mask = label_t != self.ignore_index
+            label_t.masked_fill_(torch.logical_not(mask), 0.)
+
+            optimizer.zero_grad()
 
             with torch.set_grad_enabled(True):
-                logits_t, *_ = model(src_seq_t)
-                loss_t = loss_fn(logits_t, label_t)
-                loss_t = loss_t.mean(-1)
+                logits_t = model(src_seq_t)
+                loss_t = loss_fn(logits_t, label_t.float())
+                loss_t *= mask.float()
+                loss_t = loss_t.mean(0).sum(0)
 
                 if self.args.gradient_accumulation_steps > 1:
                     # scale the loss if gradient accumulation is used
@@ -82,7 +99,6 @@ class ClassificationTask(OmniTask):
                 if batch_idx % self.args.gradient_accumulation_steps == 0:
                     optimizer.step()
                     scheduler.step()
-                    optimizer.zero_grad()
 
             # update metrics
             steps += 1
@@ -95,8 +111,6 @@ class ClassificationTask(OmniTask):
                 torch.cuda.empty_cache()
                 print(f"batch : {batch_idx}")
 
-            # TODO: add gradual unfreeze
-
             if (steps / self.args.gradient_accumulation_steps) == self.args.steps_per_epoch:
                 break
 
@@ -106,9 +120,8 @@ class ClassificationTask(OmniTask):
         self.global_step += int(steps)
         return total_loss, accuracy
 
-    @classmethod
     def eval(
-            cls,
+            self,
             model: nn.Module,
             dataloader: OmniDataset,
             device,
@@ -116,7 +129,9 @@ class ClassificationTask(OmniTask):
     ):
         model.eval()
 
-        loss_fn = cls.get_loss_fn()
+        loss_fn = self.get_loss_fn(
+            type=kwargs.get("loss_type", "binary_cross_entropy")
+        )
         total_loss = 0
         n_pred_total = 0
         n_pred_correct = 0
@@ -129,11 +144,17 @@ class ClassificationTask(OmniTask):
             batch = tuple(t.to(device) for t in batch)
             src_seq_t, labels_t = batch
 
-            with torch.set_grad_enabled(False):
-                logits_t, *_ = model(src_seq_t)
-                loss_t = loss_fn(logits_t, labels_t).mean(-1).item()
+            # compute mask
+            mask = labels_t != self.ignore_index
+            labels_t.masked_fill_(1 - mask, 0.)
 
-            pred_t, n_correct = cls.compute_correct(logits_t, labels_t)
+            with torch.set_grad_enabled(False):
+                logits_t = model(src_seq_t)
+                loss_t = loss_fn(logits_t, labels_t.float())
+                loss_t *= mask
+                loss_t = loss_t.mean(0).sum(0)
+
+            pred_t, n_correct = self.compute_correct(logits_t, labels_t)
             preds.append(pred_t.detach_().cpu().numpy())
             labels.append(labels_t.detach_().cpu().numpy())
 
