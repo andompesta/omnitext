@@ -57,15 +57,6 @@ class OmniDataset(Dataset):
         """
         ...
 
-    @abstractmethod
-    def size(self, index: int):
-        """
-        return an example's size as a float or tuple. This method is used to enforce ``--max-position`` during batching
-        :param index:
-        :return:
-        """
-        ...
-
     def ordered_indices(self) -> List[int]:
         """
         Return an ordered list of indices. Batches are constructed based on this order.

@@ -15,7 +15,7 @@ from src.tasks import MultilabelClassificationTask
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task_name", default="multilabel")
+    parser.add_argument("--task_name", default="multilingual")
     parser.add_argument("--model_version", default="")
     parser.add_argument("--db_name", default="jigsaw_multilingual")
     parser.add_argument("--db_version", default="")
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     train_epoch_gen = get_classify_dataset(
         os.path.join(
             settings.get("data_dir"),
-            "multilabel",
+            "multilingual",
             f"{db_name}.pt"
         ),
         "train",
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     eval_epoch_gen = get_classify_dataset(
         os.path.join(
             settings.get("data_dir"),
-            "multilabel",
+            "multilingual",
             f"{db_name}.pt"
         ),
         "eval",

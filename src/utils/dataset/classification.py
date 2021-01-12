@@ -73,24 +73,52 @@ class ClassifyDataset(OmniDataset):
     ) ->int:
         return self.sizes[index]
 
-    def size(
-            self,
-            index: int
-    ) -> int:
-        return self.sizes[index]
-
     def collate(
             self,
             samples: Tuple[List[List[int]], List[int], List[int]]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return classify_collate(samples, self.tensor_type, self.pad_token_id)
 
-    def ordered_indices(self) -> List[int]:
+    def ordered_indices(self) -> np.array:
+        """
+        Get a list or example's indixes ordered randomly or by sizes
+        """
         if self.shuffle:
             indices = np.random.permutation(len(self))
         else:
             indices = np.arrange(len(self))
-        return indices[np.argsort(self.sizes[indices], kind='mergesort')]
+            indices = indices[np.argsort(self.sizes[indices], kind='mergesort')]
+        return indices
+
+    def ensure_positive_indices(self) -> np.array:
+        """
+        Return a list of indices ordered by positive examples first
+        """
+        indices = np.arange(len(self))
+        labels = np.array(self.labels)
+
+        positive_labels = labels > 0
+        if len(positive_labels.shape) == 2:
+            positive_labels = positive_labels.any(axis=1)
+
+        assert len(positive_labels.shape) == 1
+
+        positive_indices = indices[positive_labels]
+        negative_indices = indices[np.logical_not(positive_labels)]
+
+        if self.shuffle:
+            np.random.shuffle(positive_indices)
+            np.random.shuffle(negative_indices)
+        else:
+            positive_indices = positive_indices[np.argsort(self.sizes[positive_indices], kind='mergesort')]
+            negative_indices = negative_indices[np.argsort(self.sizes[negative_indices], kind='mergesort')]
+
+        return np.concatenate(
+            (
+                positive_indices,
+                negative_indices
+            ), axis=0
+        )
 
     def prefetch(self, indices: List[int]):
         self.input_ids.prefetch(indices)

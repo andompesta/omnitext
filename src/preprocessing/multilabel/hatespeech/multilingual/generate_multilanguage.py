@@ -66,7 +66,8 @@ if __name__ == '__main__':
     collector["train"] = encode(
         db_path=os.path.join(
             settings.get("data_dir"),
-            "hatespeech"
+            "multilabel/hatespeech",
+            "multilingual"
         ),
         db_name="train",
         tokenizer=XLMRobertaTokenizer.from_pretrained("xlm-roberta-base")
@@ -75,7 +76,8 @@ if __name__ == '__main__':
     collector["eval"] = encode(
         db_path=os.path.join(
             settings.get("data_dir"),
-            "hatespeech"
+            "multilabel/hatespeech",
+            "multilingual"
         ),
         db_name="eval",
         tokenizer=XLMRobertaTokenizer.from_pretrained("xlm-roberta-base")
@@ -84,7 +86,8 @@ if __name__ == '__main__':
     collector["test"] = encode(
         db_path=os.path.join(
             settings.get("data_dir"),
-            "hatespeech",
+            "multilabel/hatespeech",
+            "multilingual"
         ),
         db_name="test",
         tokenizer=XLMRobertaTokenizer.from_pretrained("xlm-roberta-base")
@@ -93,7 +96,7 @@ if __name__ == '__main__':
     save_obj_to_file(
         os.path.join(
             settings.get("data_dir"),
-            "multilabel",
+            "multilabel/hatespeech",
             "jigsaw_multilingual.pt"
         ),
         collector
